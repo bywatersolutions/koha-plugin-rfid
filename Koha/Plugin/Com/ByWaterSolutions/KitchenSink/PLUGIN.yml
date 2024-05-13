@@ -1,0 +1,9 @@
+name: Example Kitchen-Sink Plugin
+author: Kyle M Hall
+date_authored: 2009-01-27
+date_updated: 1900-01-01
+minimum_version: {MINIMUM_VERSION}
+maximum_version:
+version: {VERSION}
+description: This plugin implements every available feature of the plugin system and is meant to be documentation and a starting point for writing your own plugins!
+module: Koha::Plugin::Com::ByWaterSolutions::KitchenSink
