@@ -54,7 +54,7 @@ jobs:
       run: |
         cd ..
         git clone --branch ${{ steps.koha-version.outputs.current-branch-name }} --single-branch --depth 1 https://github.com/Koha-Community/Koha.git kohaclone
-      
+
     - name: Export additional variables needed by koha-testing-docker
       run: |
         cd ..
@@ -171,7 +171,7 @@ jobs:
         release-version: ${{ steps.myvars.outputs.tag_version }}
         release-name: ${{ steps.myvars.outputs.github_repo }}
         minimum-version: ${{ steps.koha-version-oldstable.outputs.version-major-minor }}
-        plugin-module: "Koha/Plugin/Com/ByWaterSolutions/KitchenSink.pm"
+        plugin-module: "Koha/Plugin/Com/ByWaterSolutions/TechLogicCircIt.pm"
 
     - name: See if kpz was created
       run: |
