@@ -68,22 +68,26 @@ const rfid_get_items_url = `${circit_address}/getitems`;
 
 $(document).ready(function() {
     $.getJSON(rfid_get_items_url, function(data) {
-        if (data.status === true) {
-            const href = window.location.href;
-            if (href.indexOf("circulation.pl") > -1) {
-                if ($("h1:contains(Batch check out)")) {
-                    handle_batch_checkout();
-                } else {
-                    handle_checkout();
-                }
-            }
-        } else {
-            display_rfid_failure();
-        }
+        detect_and_handle_rfid_for_page(data);
     }).fail(function() {
         display_rfid_failure();
     })
 });
+
+function detect_and_handle_rfid_for_page(data) {
+    if (data.status === true) {
+        const href = window.location.href;
+        if (href.indexOf("circulation.pl") > -1) {
+            if ($("h1:contains(Batch check out)")) {
+                handle_batch_checkout();
+            } else {
+                handle_checkout();
+            }
+        }
+    } else {
+        display_rfid_failure();
+    }
+}
 
 function display_rfid_failure() {
     console.log("RFID FAILURE");
@@ -118,7 +122,7 @@ let alter_security_bits = async (barcodes, bit_value) => {
 
 function handle_checkout() {
     console.log("handle_checkout");
-
+    console.log("NOT YET IMPLEMENTED");
 }
 
 function poll_rfid_for_barcodes_batch(cb) {
@@ -133,10 +137,9 @@ function poll_rfid_for_barcodes_batch(cb) {
                     // No more items have been added since the last check
                     // so it's time to process the stack of items.
                     clearInterval(intervalID);
-                    console.log("Barcode batch ready for handling, calling callback with data", callback, data);
+                    console.log("DO IT");
                     cb(data);
                 } else {
-                    console.log("The count of items on the RFID pad has changed, waiting for RFID scanner to finish reading RFID tags");
                     items_count = data.items.length;
                 }
             }
