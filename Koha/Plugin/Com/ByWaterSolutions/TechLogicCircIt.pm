@@ -63,7 +63,94 @@ sub intranet_js {
     my ( $self ) = @_;
 
     return q|
-        <script>console.log("Thanks for testing the kitchen sink plugin!");</script>
+const circit_address = "http://localhost:9201";
+const rfid_get_items_url = `${circit_address}/getitems`;
+
+$(document).ready(function() {
+    $.getJSON(rfid_get_items_url, function(data) {
+        if (data.status === true) {
+            const href = window.location.href;
+            if (href.indexOf("circulation.pl") > -1) {
+                if ($("h1:contains(Batch check out)")) {
+                    handle_batch_checkout();
+                } else {
+                    handle_checkout();
+                }
+            }
+        } else {
+            display_rfid_failure();
+        }
+    }).fail(function() {
+        display_rfid_failure();
+    })
+});
+
+function display_rfid_failure() {
+    console.log("RFID FAILURE");
+}
+
+function handle_batch_checkout() {
+    console.log("handle_batch_checkout");
+
+    const barcodelist = $("#barcodelist");
+    if (barcodelist.length) {
+        poll_rfid_for_barcodes_batch(function(data) {
+            let barcodes = data.items.map(function(item) {
+                return item.barcode;
+            });
+            console.log("BARCODES: ", barcodes);
+            const r = alter_security_bits(barcodes, false).then(function() {
+                barcodelist.val(barcodes.join("\r\n"));
+                const submit = barcodelist.closest('form').find(':submit');
+                submit.click();
+            });
+        });
+    }
+}
+
+let alter_security_bits = async (barcodes, bit_value) => {
+    console.log('alter_security_bits', barcodes, bit_value);
+    const result = await Promise.all(
+        barcodes.map(each => $.getJSON(`${circit_address}/setsecurity/${each}/${bit_value}`))
+    );
+    return result;
+}
+
+function handle_checkout() {
+    console.log("handle_checkout");
+
+}
+
+function poll_rfid_for_barcodes_batch(cb) {
+    console.log("poll_rfid_for_barcodes_batch", cb);
+    let items_count = 0;
+
+    const intervalID = setInterval(function() {
+        $.getJSON(rfid_get_items_url, function(data) {
+            console.log(data);
+            if (data.items && data.items.length) { // We have at least one item on the pad
+                if (items_count > 0 && items_count == data.items.length) {
+                    // No more items have been added since the last check
+                    // so it's time to process the stack of items.
+                    clearInterval(intervalID);
+                    console.log("Barcode batch ready for handling, calling callback with data", callback, data);
+                    cb(data);
+                } else {
+                    console.log("The count of items on the RFID pad has changed, waiting for RFID scanner to finish reading RFID tags");
+                    items_count = data.items.length;
+                }
+            }
+        });
+    }, 2000);
+    console.log("INTERVAL ID:", intervalID);
+    return intervalID;
+}
+
+function rfid_get_items(cb) {
+    console.log("rfid_get_items", cb);
+
+    return true;
+}
     |;
 }
 
