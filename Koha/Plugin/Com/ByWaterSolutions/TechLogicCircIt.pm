@@ -98,7 +98,7 @@ function detect_and_handle_rfid_for_page(data) {
     if (current_action) {
         switch (current_action) {
             case 'batch_checkout':
-                handle_batch_checkout();
+                handle_batch();
                 break;
             case 'checkout':
                 handle_one_at_a_time(current_action);
@@ -109,6 +109,10 @@ function detect_and_handle_rfid_for_page(data) {
             case 'renew':
                 handle_one_at_a_time(current_action);
                 break;
+            case 'list_add_items':
+                const barcodes_textarea = $("#barcodes");
+                handle_batch(current_action, barcodes_textarea);
+            break;
             default:
                 console.log(`ERROR: Action ${action} has no handler!`);
         }
@@ -136,7 +140,9 @@ function get_current_action() {
     } else if (href.indexOf("returns.pl") > -1) {
         return "checkin";
     } else if (href.indexOf("circ/renew.pl") > -1) {
-        return "renew"
+        return "renew";
+    } else if (href.indexOf("virtualshelves/shelves.pl") > -1) {
+        return "list_add_items";
     }
 }
 
@@ -275,20 +281,25 @@ function combine_barcodes(rfid_pad_barcodes, unprocessed_barcodes, processed_bar
 }
 
 
-function handle_batch_checkout() {
-    console.log("handle_batch_checkout");
+function handle_batch(action, barcodes_textarea, form_submit) {
+    console.log("handle_batch");
 
-    const barcodelist = $("#barcodelist");
-    if (barcodelist.length) {
+    if ( !barcodes_textarea ) {
+      barcodes_textarea = $("#barcodelist");
+    }
+
+    if (barcodes_textarea.length) {
         poll_rfid_for_barcodes_batch(function(data) {
             let barcodes = data.items.map(function(item) {
                 return item.barcode;
             });
             console.log("BARCODES: ", barcodes);
             const r = alter_security_bits(barcodes, false).then(function() {
-                barcodelist.val(barcodes.join("\r\n"));
-                const submit = barcodelist.closest('form').find(':submit');
-                submit.click();
+                barcodes_textarea.val(barcodes.join("\r\n"));
+                if ( !form_submit ) {
+                  form_submit = barcodes_textarea.closest('form').find(':submit');
+                }
+                form_submit.click();
             });
         });
     }
