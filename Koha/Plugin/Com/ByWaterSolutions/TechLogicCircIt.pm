@@ -71,6 +71,10 @@ let continue_processing = false;
 let intervalID = "";
 
 $(document).ready(function() {
+    initiate_rfid_scanning();
+});
+
+function initiate_rfid_scanning() {
     $.getJSON(rfid_get_items_url, function(data) {
         if (data.status === true) {
             detect_and_handle_rfid_for_page(data);
@@ -80,7 +84,7 @@ $(document).ready(function() {
     }).fail(function() {
         display_rfid_failure();
     })
-});
+}
 
 function detect_and_handle_rfid_for_page(data) {
     console.log("detect_and_handle_rfid_for_page");
@@ -98,21 +102,33 @@ function detect_and_handle_rfid_for_page(data) {
     if (current_action) {
         switch (current_action) {
             case 'batch_checkout':
-                handle_batch();
+                handle_batch(current_action, 'disable');
                 break;
             case 'checkout':
-                handle_one_at_a_time(current_action);
+                handle_one_at_a_time(current_action, 'disable');
                 break;
             case 'checkin':
-                handle_one_at_a_time(current_action);
+                handle_one_at_a_time(current_action, 'enable');
                 break;
             case 'renew':
-                handle_one_at_a_time(current_action);
+                handle_one_at_a_time(current_action, 'disable', $('[name="barcode"]'));
                 break;
             case 'list_add_items':
-                const barcodes_textarea = $("#barcodes");
-                handle_batch(current_action, barcodes_textarea);
-            break;
+                handle_batch(current_action, 'ignore', $("#barcodes"), '', function() {
+                    return false;
+                });
+                break;
+            case 'batch_item_modification':
+                handle_batch(current_action, 'ignore', $("#barcodelist"), '', function() {
+                    return false;
+                });
+                break;
+            case 'inventory':
+                handle_batch(current_action, 'ignore', $("#barcodelist"), '', function() {
+                    return false;
+                });
+                break;
+
             default:
                 console.log(`ERROR: Action ${action} has no handler!`);
         }
@@ -143,6 +159,10 @@ function get_current_action() {
         return "renew";
     } else if (href.indexOf("virtualshelves/shelves.pl") > -1) {
         return "list_add_items";
+    } else if (href.indexOf("batchMod.pl") > -1) {
+        return "batch_item_modification";
+    } else if ($("#barcodelist").length && href.indexOf("inventory.pl") > -1) {
+        return "batch_item_modification";
     }
 }
 
@@ -189,10 +209,10 @@ function display_rfid_failure() {
     console.log("RFID FAILURE");
 }
 
-function handle_one_at_a_time(action) {
+function handle_one_at_a_time(action, security_setting, barcode_input, form_submit) {
     console.log("handle_one_at_a_time");
 
-    const barcode_input = (action == "renew") ? $('[name="barcode"]') : $("#barcode");
+    barcode_input = barcode_input ? barcode_input : $("#barcode");
     const message = $("div.dialog.alert");
 
     if (message.length && !continue_processing) {
@@ -213,7 +233,6 @@ function handle_one_at_a_time(action) {
         let unprocessed_barcodes = get_unprocessed_barcodes();
 
         if (unprocessed_barcodes.length) {
-            console.log("XXXXXXADSFDSAFSDAFDSASDFAFADSDFSADSFADSFADSFFADSFADSDSFSDFASAFD");
             const barcode = unprocessed_barcodes.pop()
 
             set_unprocessed_barcodes(unprocessed_barcodes);
@@ -250,12 +269,22 @@ function handle_one_at_a_time(action) {
                     set_unprocessed_barcodes(combined_barcodes);
                     add_processed_barcode(barcode);
 
-                    // Duplicate code above, ID:1
-                    const r = alter_security_bits([barcode], true).then(function() {
-                        barcode_input.val(barcode);
-                        const submit = barcode_input.closest('form').find(':submit');
-                        submit.click();
-                    });
+                    barcode_input.val(barcode);
+                    const submit = barcode_input.closest('form').find(':submit');
+                    if (security_setting == 'enable' || security_setting == 'disable') {
+                        const security_flag_value = security_setting == 'enable' ? true : false;
+
+                        const r = alter_security_bits([barcode], security_flag_value).then(function() {
+
+                            submit.click();
+                        });
+
+                    } else { // No change in RFID security bits
+                        if (submit_form_automatically) {
+                            form_submit.click();
+                        }
+                    }
+
                 } else {
                     console.log("NO BARCODE TO PROCESS");
                     // Start again, librarian may put new stack of items on the RFID pad
@@ -266,6 +295,12 @@ function handle_one_at_a_time(action) {
             }, true); // The 'true' enables the 'no wait' option for 'one at a time' processing
         }
     }
+}
+
+// This function is for pages where bacodes cannot be run in batch *or* scanned repeatedly.
+// A good example of this is the barcode image generator
+function handle_one_and_done(action) {
+    console.log("handle_one_and_done");
 }
 
 function combine_barcodes(rfid_pad_barcodes, unprocessed_barcodes, processed_barcodes) {
@@ -281,11 +316,11 @@ function combine_barcodes(rfid_pad_barcodes, unprocessed_barcodes, processed_bar
 }
 
 
-function handle_batch(action, barcodes_textarea, form_submit) {
+function handle_batch(action, security_setting, barcodes_textarea, form_submit, auto_submit_test_cb) {
     console.log("handle_batch");
 
-    if ( !barcodes_textarea ) {
-      barcodes_textarea = $("#barcodelist");
+    if (!barcodes_textarea) {
+        barcodes_textarea = $("#barcodelist");
     }
 
     if (barcodes_textarea.length) {
@@ -294,16 +329,29 @@ function handle_batch(action, barcodes_textarea, form_submit) {
                 return item.barcode;
             });
             console.log("BARCODES: ", barcodes);
-            const r = alter_security_bits(barcodes, false).then(function() {
-                barcodes_textarea.val(barcodes.join("\r\n"));
-                if ( !form_submit ) {
-                  form_submit = barcodes_textarea.closest('form').find(':submit');
+            if (!form_submit) {
+                form_submit = barcodes_textarea.closest('form').find(':submit');
+            }
+            barcodes_textarea.val(barcodes.join("\r\n"));
+
+            const submit_form_automatically = auto_submit_test_cb ? auto_submit_test_cb(action, security_setting, barcodes_textarea, form_submit) : true;
+
+            if (security_setting == 'enable' || security_setting == 'disable') {
+                const security_flag_value = security_setting == 'enable' ? true : false;
+                const r = alter_security_bits(barcodes, security_flag_value).then(function() {
+                    if (submit_form_automatically) {
+                        form_submit.click();
+                    }
+                });
+            } else { // No change in RFID security bits
+                if (submit_form_automatically) {
+                    form_submit.click();
                 }
-                form_submit.click();
-            });
+            }
         });
     }
 }
+
 
 let alter_security_bits = async (barcodes, bit_value) => {
     console.log('alter_security_bits', barcodes, bit_value);
