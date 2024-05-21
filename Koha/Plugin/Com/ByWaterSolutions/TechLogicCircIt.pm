@@ -62,7 +62,7 @@ sub configure {
 sub intranet_js {
     my ( $self ) = @_;
 
-    return q|
+    return <<EndOfJavascript
 const circit_address = "http://localhost:9201";
 const rfid_get_items_url = `${circit_address}/getitems`;
 
@@ -72,7 +72,122 @@ let intervalID = "";
 
 $(document).ready(function() {
     initiate_rfid_scanning();
+
+    $("#checkin_search-tab").on("click", function() {
+        handle_action_change('checkin');
+        handle_one_at_a_time('checkin', 'enable', $("#ret_barcode"));
+    });
+
+    $("#renew_search-tab").on("click", function() {
+        handle_action_change('renew');
+        handle_one_at_a_time('checkin', 'enable', $("#ren_barcode"));
+    });
+
+    $("#catalog_search-tab").on("click", function() {
+        handle_action_change('search');
+
+        let action = "search";
+        let security_setting = "ignore";
+        let barcode_input = $("#search-form");
+        let form_submit;
+        let auto_submit_test_cb = () => {
+            return false;
+        };
+        handle_one_and_done(action, security_setting, barcode_input, form_submit, auto_submit_test_cb)
+    });
+
+    //TODO: Should we restart rfid scanning ( initiate_rfid_scanning ) somehow? Or just require reloading the page?
+
 });
+
+function handle_one_at_a_time(action, security_setting, barcode_input, form_submit, submit_form_automatically) {
+    console.log("handle_one_at_a_time");
+
+    barcode_input = barcode_input ? barcode_input : $("#barcode");
+    console.log("INPUT", barcode_input);
+
+    const message = $("div.dialog.alert");
+
+    if (message.length && !continue_processing) {
+        if (action != 'renew') { // renew has it's own "continue" button
+            console.log("THERE IS A MESSAGE");
+            const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
+            message.append(btn);
+            message.on("click", "button.rfid-continue", function() {
+                console.log("CLICKED rfid-continue BUTTON");
+                $("button.rfid-continue").hide();
+                continue_processing = true;
+                handle_one_at_a_time();
+            });
+        }
+    } else if (barcode_input.length) {
+        // For one at a time pages, we can keep processing the current unproccessed items
+        // once that list is empty we go looking for more items on the RFID pad
+        let unprocessed_barcodes = get_unprocessed_barcodes();
+
+        if (unprocessed_barcodes.length) {
+            const barcode = unprocessed_barcodes.pop()
+
+            set_unprocessed_barcodes(unprocessed_barcodes);
+            add_processed_barcode(barcode);
+
+            // Duplicate code below, ID:1
+            const r = alter_security_bits([barcode], true).then(function() {
+                console.log("BARCODE INPUT 2", barcode_input);
+                barcode_input.val(barcode);
+                const submit = barcode_input.closest('form').find(':submit');
+                submit.click();
+            });
+
+
+        } else { // We have no unprocessed barcodes, let's look for some on the RFID pad
+
+            poll_rfid_for_barcodes_batch(function(data) {
+                let unprocessed_barcodes = get_unprocessed_barcodes();
+                console.log("UNPROCESSED BARCODES: ", unprocessed_barcodes);
+
+                let rfid_pad_barcodes = data.items.map(function(item) {
+                    return item.barcode;
+                });
+                console.log("NEW BARCODES: ", rfid_pad_barcodes);
+
+                let processed_barcodes = get_processed_barcodes();
+
+                let combined_barcodes = combine_barcodes(rfid_pad_barcodes, unprocessed_barcodes, processed_barcodes);
+                console.log("COMBINED BARCODES: ", combined_barcodes);
+
+                const barcode = combined_barcodes.pop()
+                if (barcode) {
+                    set_unprocessed_barcodes(combined_barcodes);
+                    add_processed_barcode(barcode);
+
+                    barcode_input.val(barcode);
+                    const submit = barcode_input.closest('form').find(':submit');
+                    if (security_setting == 'enable' || security_setting == 'disable') {
+                        const security_flag_value = security_setting == 'enable' ? true : false;
+
+                        const r = alter_security_bits([barcode], security_flag_value).then(function() {
+
+                            submit.click();
+                        });
+
+                    } else { // No change in RFID security bits
+                        if (submit_form_automatically) {
+                            form_submit.click();
+                        }
+                    }
+
+                } else {
+                    console.log("NO BARCODE TO PROCESS");
+                    // Start again, librarian may put new stack of items on the RFID pad
+                    handle_one_at_a_time();
+                }
+
+
+            }, true); // The 'true' enables the 'no wait' option for 'one at a time' processing
+        }
+    }
+}
 
 function initiate_rfid_scanning() {
     $.getJSON(rfid_get_items_url, function(data) {
@@ -128,7 +243,11 @@ function detect_and_handle_rfid_for_page(data) {
                     return false;
                 });
                 break;
-
+            case 'quick-spine-label':
+                handle_one_and_done(current_action, 'ignore', $("#barcode"), '', function() {
+                    return false;
+                });
+                break;
             default:
                 console.log(`ERROR: Action ${action} has no handler!`);
         }
@@ -138,9 +257,17 @@ function detect_and_handle_rfid_for_page(data) {
 // We've gone from one action to another
 // e.g. from checkout to checkin, or batch checkout to batch item modifer
 // Clear out the queued up barcodes and start fresh
-function handle_action_change() {
+function handle_action_change(action) {
     console.log("handle_action_change");
-    set_previous_action("");
+
+    action = action ? action : "";
+
+    if (intervalID) {
+        clearInterval(intervalID);
+        intervalID = null;
+    }
+
+    set_previous_action(action);
     set_unprocessed_barcodes([]);
     set_processed_barcodes([]);
 };
@@ -163,6 +290,8 @@ function get_current_action() {
         return "batch_item_modification";
     } else if ($("#barcodelist").length && href.indexOf("inventory.pl") > -1) {
         return "batch_item_modification";
+    } else if (href.indexOf("spinelabel-home.pl") > -1) {
+        return "quick-spine-label";
     }
 }
 
@@ -190,7 +319,7 @@ function get_unprocessed_barcodes() {
 function get_processed_barcodes() {
     console.log("get_processed_barcodes");
     const barcodes_json = localStorage.getItem("koha_plugin_rfid_circit_processed_barcodes");
-    console.log("UNPROCESSED BARCODES JSON: ", barcodes_json);
+    console.log("PROCESSED BARCODES JSON: ", barcodes_json);
     let barcodes = barcodes_json ? JSON.parse(barcodes_json) : [];
     return barcodes;
 }
@@ -209,98 +338,47 @@ function display_rfid_failure() {
     console.log("RFID FAILURE");
 }
 
-function handle_one_at_a_time(action, security_setting, barcode_input, form_submit) {
-    console.log("handle_one_at_a_time");
+// This function is for pages where bacodes cannot be run in batch *or* scanned repeatedly.
+// A good example of this is the barcode image generator
+function handle_one_and_done(action, security_setting, barcode_input, form_submit, auto_submit_test_cb) {
+    console.log("handle_one_and_done");
 
-    barcode_input = barcode_input ? barcode_input : $("#barcode");
-    const message = $("div.dialog.alert");
+    console.log(barcode_input);
+    if (!barcode_input) {
+        barcode_input = $("#barcode");
+    }
 
-    if (message.length && !continue_processing) {
-        if (action != 'renew') { // renew has it's own "continue" button
-            console.log("THERE IS A MESSAGE");
-            const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
-            message.append(btn);
-            message.on("click", "button.rfid-continue", function() {
-                console.log("CLICKED rfid-continue BUTTON");
-                $("button.rfid-continue").hide();
-                continue_processing = true;
-                handle_one_at_a_time();
+    if (barcode_input.length) {
+        poll_rfid_for_barcodes_batch(function(data) {
+            let barcodes = data.items.map(function(item) {
+                return item.barcode;
             });
-        }
-    } else if (barcode_input.length) {
-        // For one at a time pages, we can keep processing the current unproccessed items
-        // once that list is empty we go looking for more items on the RFID pad
-        let unprocessed_barcodes = get_unprocessed_barcodes();
+            console.log("BARCODES: ", barcodes);
 
-        if (unprocessed_barcodes.length) {
-            const barcode = unprocessed_barcodes.pop()
+            if (barcodes.length > 1) {
+                alert("More than one RFID tag is on the reader. Please remove all but one RFID tag and click 'OK'");
+                handle_one_and_done(action, security_setting, barcode_input, form_submit, auto_submit_test_cb)
+            } else {
+                barcode_input.val(barcodes[0]);
 
-            set_unprocessed_barcodes(unprocessed_barcodes);
-            add_processed_barcode(barcode);
+                const submit_form_automatically = auto_submit_test_cb ? auto_submit_test_cb(action, security_setting, barcode_input, form_submit) : true;
 
-            // Duplicate code below, ID:1
-            const r = alter_security_bits([barcode], true).then(function() {
-                barcode_input.val(barcode);
-                const submit = barcode_input.closest('form').find(':submit');
-                submit.click();
-            });
-
-
-        } else { // We have no unprocessed barcodes, let's look for some on the RFID pad
-
-            poll_rfid_for_barcodes_batch(function(data) {
-                let unprocessed_barcodes = get_unprocessed_barcodes();
-                console.log("UNPROCESSED BARCODES: ", unprocessed_barcodes);
-
-
-
-                let rfid_pad_barcodes = data.items.map(function(item) {
-                    return item.barcode;
-                });
-                console.log("NEW BARCODES: ", rfid_pad_barcodes);
-
-                let processed_barcodes = get_processed_barcodes();
-
-                let combined_barcodes = combine_barcodes(rfid_pad_barcodes, unprocessed_barcodes, processed_barcodes);
-                console.log("COMBINED BARCODES: ", combined_barcodes);
-
-                const barcode = combined_barcodes.pop()
-                if (barcode) {
-                    set_unprocessed_barcodes(combined_barcodes);
-                    add_processed_barcode(barcode);
-
-                    barcode_input.val(barcode);
-                    const submit = barcode_input.closest('form').find(':submit');
-                    if (security_setting == 'enable' || security_setting == 'disable') {
-                        const security_flag_value = security_setting == 'enable' ? true : false;
-
-                        const r = alter_security_bits([barcode], security_flag_value).then(function() {
-
-                            submit.click();
-                        });
-
-                    } else { // No change in RFID security bits
+                if (security_setting == 'enable' || security_setting == 'disable') {
+                    const security_flag_value = security_setting == 'enable' ? true : false;
+                    const r = alter_security_bits(barcodes, security_flag_value).then(function() {
                         if (submit_form_automatically) {
                             form_submit.click();
                         }
+                    });
+                } else { // No change in RFID security bits
+                    if (submit_form_automatically) {
+                        form_submit.click();
                     }
-
-                } else {
-                    console.log("NO BARCODE TO PROCESS");
-                    // Start again, librarian may put new stack of items on the RFID pad
-                    handle_one_at_a_time();
                 }
 
-
-            }, true); // The 'true' enables the 'no wait' option for 'one at a time' processing
-        }
+            }
+        });
     }
-}
-
-// This function is for pages where bacodes cannot be run in batch *or* scanned repeatedly.
-// A good example of this is the barcode image generator
-function handle_one_and_done(action) {
-    console.log("handle_one_and_done");
 }
 
 function combine_barcodes(rfid_pad_barcodes, unprocessed_barcodes, processed_barcodes) {
@@ -378,9 +456,9 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
                 } else {
                     items_count = data.items.length;
                 }
-            } else if (no_wait) {
+            } else if (data.items.length && no_wait) {
                 clearInterval(intervalID);
-                console.log("NOT WAIT ENABLED, INTIATED CALLBACK");
+                console.log("NO WAIT ENABLED, INTIATED CALLBACK");
                 cb(data);
             }
         });
@@ -388,7 +466,9 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
     console.log("INTERVAL ID:", intervalID);
     return intervalID;
 }
-    |;
+EndOfJavascript
+;
+
 }
 
 1;
