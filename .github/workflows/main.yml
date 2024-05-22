@@ -2,7 +2,7 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - 'v*.*.*'
   schedule:
@@ -115,7 +115,7 @@ jobs:
         echo "/DOCKER LOGS"
         docker cp $GITHUB_REPO/. koha_koha_1:/var/lib/koha/kohadev/plugins
         docker exec koha_koha_1 bash -c 'prove /var/lib/koha/kohadev/plugins/t'
-        
+
     - name: Post test cleanup
       run: |
         docker-compose down
@@ -171,7 +171,7 @@ jobs:
         release-version: ${{ steps.myvars.outputs.tag_version }}
         release-name: ${{ steps.myvars.outputs.github_repo }}
         minimum-version: ${{ steps.koha-version-oldstable.outputs.version-major-minor }}
-        plugin-module: "Koha/Plugin/Com/ByWaterSolutions/TechLogicCircIt.pm"
+        plugin-module: "Koha/Plugin/Com/ByWaterSolutions/RFID.pm"
 
     - name: See if kpz was created
       run: |

@@ -1,4 +1,4 @@
-package Koha::Plugin::Com::ByWaterSolutions::TechLogicCircIt;
+package Koha::Plugin::Com::ByWaterSolutions::RFID;
 
 use Modern::Perl;
 
@@ -9,15 +9,15 @@ our $MINIMUM_VERSION = "{MINIMUM_VERSION}";
 
 ## Here is our metadata, some keys are required, some are optional
 our $metadata = {
-    name            => 'Tech Logic CircIT',
+    name            => 'RFID',
     author          => 'Kyle M Hall',
     date_authored   => '2024-05-13',
     date_updated    => "1900-01-01",
     minimum_version => $MINIMUM_VERSION,
     maximum_version => undef,
     version         => $VERSION,
-    description     => 'Add support for Tech Logic CircIT to Koha',
-    namespace       => 'techlogiccircit',
+    description     => 'Add support for RFID reading via Tech Logic CircIT',
+    namespace       => 'rfid',
 };
 
 ## This is the minimum code required for a plugin's 'new' method
