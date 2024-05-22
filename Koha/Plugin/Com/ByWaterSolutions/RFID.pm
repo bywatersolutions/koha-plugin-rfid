@@ -62,7 +62,7 @@ sub configure {
 sub intranet_js {
     my ( $self ) = @_;
 
-    return <<EndOfJavascript
+    return <<'EOF';
 const circit_address = "http://localhost:9201";
 const rfid_get_items_url = `${circit_address}/getitems`;
 
@@ -466,7 +466,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
     console.log("INTERVAL ID:", intervalID);
     return intervalID;
 }
-EndOfJavascript
+EOF
 ;
 
 }
