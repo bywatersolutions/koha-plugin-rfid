@@ -55,8 +55,11 @@ function handle_one_at_a_time(
     : barcode_input.closest("form").find(":submit");
 
   const message = $("div.dialog.alert");
+  const modal = $("#circ-needsconfirmation-modal");
 
-  if (message.length && !continue_processing) {
+  if (modal.length) {
+    // Do nothing, the built in modal will reload the page when a button in it is clicked
+  } else if (message.length && !continue_processing) {
     if (action != "renew") {
       // renew has it's own "continue" button
       console.log("THERE IS A MESSAGE");
