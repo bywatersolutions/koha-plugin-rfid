@@ -5,6 +5,8 @@ const rfid_get_items_url = `${circit_address}/getitems`;
 let continue_processing = false;
 let intervalID = "";
 
+let parallel_set_security = false; // Controls if flipping the security bit on the tags happens one at a time or in parallel
+
 $(document).ready(function () {
   initiate_rfid_scanning();
 
@@ -458,12 +460,30 @@ function handle_batch(
 
 let alter_security_bits = async (barcodes, bit_value) => {
   console.log("alter_security_bits", barcodes, bit_value);
-  const result = await Promise.all(
-    barcodes.map((each) =>
-      $.getJSON(`${circit_address}/setsecurity/${each}/${bit_value}`),
-    ),
-  );
-  return result;
+  if (parallel_set_security) {
+    const result = await Promise.all(
+      barcodes.map((each) =>
+        $.getJSON(`${circit_address}/setsecurity/${each}/${bit_value}`),
+      ),
+    );
+    return result;
+  } else {
+    let result = true;
+    console.log("barcodes", barcodes);
+    barcodes.forEach((each) =>
+      $.ajax({
+        url: `${circit_address}/setsecurity/${each}/${bit_value}`,
+        dataType: "json",
+        async: false,
+        success: function (data) {
+          console.log(data);
+        },
+        failure: function () {
+          result = false;
+        },
+      }),
+    );
+  }
 };
 
 function poll_rfid_for_barcodes_batch(cb, no_wait) {
@@ -486,7 +506,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
         } else {
           items_count = data.items.length;
         }
-      } else if (data.items.length && no_wait) {
+      } else if (data && data.items && data.items.length && no_wait) {
         clearInterval(intervalID);
         console.log("NO WAIT ENABLED, INTIATED CALLBACK");
         cb(data);
