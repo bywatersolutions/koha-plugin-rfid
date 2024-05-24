@@ -54,22 +54,37 @@ function handle_one_at_a_time(
     ? form_submit
     : barcode_input.closest("form").find(":submit");
 
-  const message = $("div.dialog.alert");
-  const modal = $("#circ-needsconfirmation-modal");
-
-  if (modal.length) {
+  if ($("#wrong-transfer-modal").length && !continue_processing) {
+    console.log("WRONG TRANSFER");
     // Do nothing, the built in modal will reload the page when a button in it is clicked
-  } else if (message.length && !continue_processing) {
+  } else if (
+    $("#circ-needsconfirmation-modal").length &&
+    !continue_processing
+  ) {
+    console.log("NEEDS CONFIMRATION");
+    const button = $("#circ-needsconfirmation-modal button.deny");
+    button.on("click", function () {
+      continue_processing = true;
+      initiate_rfid_scanning();
+    });
+  } else if ($("div.dialog.alert").length && !continue_processing) {
     if (action != "renew") {
-      // renew has it's own "continue" button
-      console.log("THERE IS A MESSAGE");
+      console.log("NEEDS ALERT CONFIRMATION");
+      const message = $("div.dialog.alert");
+
+      //FIXME: Show this button only when necessary
       const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
       message.append(btn);
       message.on("click", "button.rfid-continue", function () {
-        console.log("CLICKED rfid-continue BUTTON");
         $("button.rfid-continue").hide();
         continue_processing = true;
-        handle_one_at_a_time();
+        handle_one_at_a_time(
+          action,
+          security_setting,
+          barcode_input,
+          form_submit,
+          submit_form_automatically,
+        );
       });
     }
   } else if (barcode_input.length) {
