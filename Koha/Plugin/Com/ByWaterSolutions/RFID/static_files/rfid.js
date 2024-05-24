@@ -5,8 +5,6 @@ const rfid_get_items_url = `${circit_address}/getitems`;
 let continue_processing = false;
 let intervalID = "";
 
-let parallel_set_security = false; // Controls if flipping the security bit on the tags happens one at a time or in parallel
-
 $(document).ready(function () {
   initiate_rfid_scanning();
 
@@ -52,7 +50,9 @@ function handle_one_at_a_time(
   console.log("handle_one_at_a_time");
 
   barcode_input = barcode_input ? barcode_input : $("#barcode");
-  console.log("INPUT", barcode_input);
+  form_submit = form_submit
+    ? form_submit
+    : barcode_input.closest("form").find(":submit");
 
   const message = $("div.dialog.alert");
 
@@ -80,13 +80,14 @@ function handle_one_at_a_time(
       set_unprocessed_barcodes(unprocessed_barcodes);
       add_processed_barcode(barcode);
 
-      // Duplicate code below, ID:1
-      const r = alter_security_bits([barcode], true).then(function () {
-        console.log("BARCODE INPUT 2", barcode_input);
-        barcode_input.val(barcode);
-        const submit = barcode_input.closest("form").find(":submit");
-        submit.click();
-      });
+      set_security_and_submit_single_barcode(
+        barcode,
+        action,
+        security_setting,
+        barcode_input,
+        form_submit,
+        submit_form_automatically,
+      );
     } else {
       // We have no unprocessed barcodes, let's look for some on the RFID pad
 
@@ -113,29 +114,45 @@ function handle_one_at_a_time(
           set_unprocessed_barcodes(combined_barcodes);
           add_processed_barcode(barcode);
 
-          barcode_input.val(barcode);
-          const submit = barcode_input.closest("form").find(":submit");
-          if (security_setting == "enable" || security_setting == "disable") {
-            const security_flag_value =
-              security_setting == "enable" ? true : false;
-
-            const r = alter_security_bits([barcode], security_flag_value).then(
-              function () {
-                submit.click();
-              },
-            );
-          } else {
-            // No change in RFID security bits
-            if (submit_form_automatically) {
-              form_submit.click();
-            }
-          }
+          set_security_and_submit_single_barcode(
+            barcode,
+            action,
+            security_setting,
+            barcode_input,
+            form_submit,
+            submit_form_automatically,
+          );
         } else {
           console.log("NO BARCODE TO PROCESS");
           // Start again, librarian may put new stack of items on the RFID pad
           handle_one_at_a_time();
         }
       }, true); // The 'true' enables the 'no wait' option for 'one at a time' processing
+    }
+  }
+}
+
+function set_security_and_submit_single_barcode(
+  barcode,
+  action,
+  security_setting,
+  barcode_input,
+  form_submit,
+  submit_form_automatically,
+) {
+  barcode_input.val(barcode);
+  if (security_setting == "enable" || security_setting == "disable") {
+    const security_flag_value = security_setting == "enable" ? true : false;
+
+    const r = alter_security_bits([barcode], security_flag_value).then(
+      function () {
+        form_submit.click();
+      },
+    );
+  } else {
+    // No change in RFID security bits
+    if (submit_form_automatically) {
+      form_submit.click();
     }
   }
 }
@@ -460,30 +477,20 @@ function handle_batch(
 
 let alter_security_bits = async (barcodes, bit_value) => {
   console.log("alter_security_bits", barcodes, bit_value);
-  if (parallel_set_security) {
-    const result = await Promise.all(
-      barcodes.map((each) =>
-        $.getJSON(`${circit_address}/setsecurity/${each}/${bit_value}`),
-      ),
-    );
-    return result;
-  } else {
-    let result = true;
-    console.log("barcodes", barcodes);
-    barcodes.forEach((each) =>
-      $.ajax({
-        url: `${circit_address}/setsecurity/${each}/${bit_value}`,
-        dataType: "json",
-        async: false,
-        success: function (data) {
-          console.log(data);
-        },
-        failure: function () {
-          result = false;
-        },
-      }),
-    );
-  }
+  barcodes.forEach((each) =>
+    $.ajax({
+      url: `${circit_address}/setsecurity/${each}/${bit_value}`,
+      dataType: "json",
+      async: false,
+      success: function (data) {
+        console.log("setsecurity RETURNED", data);
+        return data;
+      },
+      failure: function () {
+        result = false;
+      },
+    }),
+  );
 };
 
 function poll_rfid_for_barcodes_batch(cb, no_wait) {
