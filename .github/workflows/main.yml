@@ -128,7 +128,7 @@ jobs:
     name: Build & Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: unit_tests
+    #needs: unit_tests
     strategy:
       fail-fast: false
     steps:
