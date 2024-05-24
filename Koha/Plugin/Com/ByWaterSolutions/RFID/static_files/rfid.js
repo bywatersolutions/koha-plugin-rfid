@@ -519,7 +519,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
         cb(data);
       }
     });
-  }, 1000);
+  }, 1500);
   console.log("INTERVAL ID:", intervalID);
   return intervalID;
 }
