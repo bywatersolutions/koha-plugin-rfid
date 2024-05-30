@@ -48,14 +48,14 @@ sub configure {
 
         ## Grab the values we already have for our settings, if any exist
         $template->param(
-            SomeSetting => $self->retrieve_data('SomeSetting'),
+            TechLogicCircItPort => $self->retrieve_data('TechLogicCircItPort'),
         );
 
         $self->output_html($template->output());
     }
     else {
         $self->store_data({
-            SomeSetting => $cgi->param('SomeSetting'),
+            TechLogicCircItPort => $cgi->param('TechLogicCircItPort'),
         });
         $self->go_home();
     }
@@ -79,7 +79,13 @@ sub static_routes {
 sub intranet_js {
     my ( $self ) = @_;
 
-    return '<script type="text/javascript" src="/api/v1/contrib/rfid/static/static_files/rfid.js"></script>';
+    my $TechLogicCircItPort = $self->retrieve_data('TechLogicCircItPort') || '9201';
+    return qq{
+     <script>
+        const TechLogicCircItPort = "$TechLogicCircItPort";
+     </script>
+     <script type="text/javascript" src="/api/v1/contrib/rfid/static/static_files/rfid.js"></script>
+    };
 }
 
 1;
