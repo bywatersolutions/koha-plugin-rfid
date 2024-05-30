@@ -1,4 +1,4 @@
-const circit_address = "http://localhost:9201";
+const circit_address = `http://localhost:${TechLogicCircItPort}` || "9201";
 const rfid_get_items_url = `${circit_address}/getitems`;
 
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
