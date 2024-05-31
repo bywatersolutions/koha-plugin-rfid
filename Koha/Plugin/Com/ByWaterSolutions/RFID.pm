@@ -6,7 +6,7 @@ use Mojo::JSON qw(decode_json);
 
 use base qw(Koha::Plugins::Base);
 
-our $VERSION = "{VERSION}";
+our $VERSION         = "{VERSION}";
 our $MINIMUM_VERSION = "{MINIMUM_VERSION}";
 
 ## Here is our metadata, some keys are required, some are optional
@@ -25,7 +25,7 @@ our $metadata = {
 ## This is the minimum code required for a plugin's 'new' method
 ## More can be added, but none should be removed
 sub new {
-    my ( $class, $args ) = @_;
+    my ($class, $args) = @_;
 
     ## We need to add our metadata here so our base class can access it
     $args->{'metadata'} = $metadata;
@@ -48,27 +48,29 @@ sub configure {
 
         ## Grab the values we already have for our settings, if any exist
         $template->param(
-            TechLogicCircItPort => $self->retrieve_data('TechLogicCircItPort'),
+            TechLogicCircItPort                  => $self->retrieve_data('TechLogicCircItPort'),
+            TechLogicCircItNonAdministrativeMode => $self->retrieve_data('TechLogicCircItNonAdministrativeMode'),
         );
 
         $self->output_html($template->output());
     }
     else {
         $self->store_data({
-            TechLogicCircItPort => $cgi->param('TechLogicCircItPort'),
+            TechLogicCircItPort                  => $cgi->param('TechLogicCircItPort'),
+            TechLogicCircItNonAdministrativeMode => $cgi->param('TechLogicCircItNonAdministrativeMode'),
         });
         $self->go_home();
     }
 }
 
 sub api_namespace {
-    my ( $self ) = @_;
+    my ($self) = @_;
 
     return 'rfid';
 }
 
 sub static_routes {
-    my ( $self, $args ) = @_;
+    my ($self, $args) = @_;
 
     my $spec_str = $self->mbf_read('staticapi.json');
     my $spec     = decode_json($spec_str);
@@ -77,12 +79,14 @@ sub static_routes {
 }
 
 sub intranet_js {
-    my ( $self ) = @_;
+    my ($self) = @_;
 
     my $TechLogicCircItPort = $self->retrieve_data('TechLogicCircItPort') || '9201';
+    my $TechLogicCircItNonAdministrativeMode = $self->retrieve_data('TechLogicCircItNonAdministrativeMode') || q{};
     return qq{
      <script>
         const TechLogicCircItPort = "$TechLogicCircItPort";
+        const TechLogicCircItNonAdministrativeMode = "$TechLogicCircItNonAdministrativeMode";
      </script>
      <script type="text/javascript" src="/api/v1/contrib/rfid/static/static_files/rfid.js"></script>
     };
