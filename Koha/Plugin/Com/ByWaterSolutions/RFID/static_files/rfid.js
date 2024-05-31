@@ -1,5 +1,9 @@
-const circit_address = `http://localhost:${TechLogicCircItPort}` || "9201";
-const rfid_get_items_url = `${circit_address}/getitems`;
+const circit_port = TechLogicCircItNonAdministrativeMode
+  ? "80/Temporary_Listen_Addresses"
+  : TechLogicCircItPort
+    ? TechLogicCircItPort
+    : "9201";
+const circit_address = `http://localhost:${circit_port}`;
 
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
 let continue_processing = false;
@@ -176,7 +180,7 @@ function set_security_and_submit_single_barcode(
 }
 
 function initiate_rfid_scanning() {
-  $.getJSON(rfid_get_items_url, function (data) {
+  $.getJSON(`${circit_address}/getitems`, function (data) {
     if (data.status === true) {
       detect_and_handle_rfid_for_page(data);
     } else {
@@ -516,7 +520,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
   let items_count = 0;
 
   intervalID = setInterval(function () {
-    $.getJSON(rfid_get_items_url, function (data) {
+    $.getJSON(`${circit_address}/getitems`, function (data) {
       console.log(data);
       if (data.items && data.items.length) {
         // We have at least one item on the pad
