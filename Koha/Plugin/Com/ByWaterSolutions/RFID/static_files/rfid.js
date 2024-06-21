@@ -12,12 +12,12 @@ let intervalID = "";
 $(document).ready(function () {
   initiate_rfid_scanning();
 
-  $("#checkin_search-tab").on("click", function () {
+  $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
     handle_action_change("checkin");
     handle_one_at_a_time("checkin", "enable", $("#ret_barcode"));
   });
 
-  $("#renew_search-tab").on("click", function () {
+  $("#renew_search-tab,a[href='#renew_search']").on("click", function () {
     handle_action_change("renew");
     handle_one_at_a_time("checkin", "enable", $("#ren_barcode"));
   });
