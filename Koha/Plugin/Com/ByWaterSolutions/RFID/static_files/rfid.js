@@ -82,7 +82,7 @@ function handle_one_at_a_time(
       continue_processing = true;
       initiate_rfid_scanning();
     });
-  } else if ($("div.dialog.alert").length && !continue_processing) {
+  } else if ( ( $("div.dialog.alert").length || $("#hold-found1").length || $("#hold-found2").length ) && !continue_processing) {
     if (action != "renew") {
       console.log("NEEDS ALERT CONFIRMATION");
       const message = $("div.dialog.alert");
