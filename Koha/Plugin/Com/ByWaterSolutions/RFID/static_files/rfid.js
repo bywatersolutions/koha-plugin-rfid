@@ -53,6 +53,17 @@ function handle_one_at_a_time(
 ) {
   console.log("handle_one_at_a_time");
 
+  var $button = $('<button>', {
+    style: 'position: fixed; bottom: 20px; right: 20px',
+    id: 'fixedButton',
+    text: 'Reset RFID',
+    click: function() {
+      handle_action_change("");
+      initiate_rfid_scanning();
+    }
+  });
+  $('body').append($button);
+
   barcode_input = barcode_input ? barcode_input : $("#barcode");
   form_submit = form_submit
     ? form_submit
