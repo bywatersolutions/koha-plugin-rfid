@@ -55,7 +55,7 @@ function handle_one_at_a_time(
 
   var $button = $('<button>', {
     style: 'position: fixed; bottom: 20px; right: 20px',
-    id: 'fixedButton',
+    id: 'rfid-reset-button',
     text: 'Reset RFID',
     click: function() {
       handle_action_change("");
