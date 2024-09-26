@@ -1,4 +1,9 @@
-const circit_address = `http://localhost:80/Temporary_Listen_Addresses`;
+const circit_port = TechLogicCircItNonAdministrativeMode
+  ? "80/Temporary_Listen_Addresses"
+  : TechLogicCircItPort
+    ? TechLogicCircItPort
+    : "9201";
+const circit_address = `http://localhost:${circit_port}`;
 
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
 let continue_processing = false;
