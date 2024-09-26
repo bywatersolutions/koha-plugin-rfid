@@ -1,9 +1,4 @@
-const circit_port = TechLogicCircItNonAdministrativeMode
-  ? "80/Temporary_Listen_Addresses"
-  : TechLogicCircItPort
-    ? TechLogicCircItPort
-    : "9201";
-const circit_address = `http://localhost:${circit_port}`;
+const circit_address = `http://localhost:80/Temporary_Listen_Addresses`;
 
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
 let continue_processing = false;
@@ -54,7 +49,7 @@ function handle_one_at_a_time(
   console.log("handle_one_at_a_time");
 
   var $button = $('<button>', {
-    style: 'position: fixed; bottom: 20px; right: 20px',
+    style: 'position: fixed; bottom: 20px; right: 20px; background-color: red; color: white; font-weight: bold',
     id: 'rfid-reset-button',
     text: 'Reset RFID',
     click: function() {
@@ -82,7 +77,7 @@ function handle_one_at_a_time(
       continue_processing = true;
       initiate_rfid_scanning();
     });
-  } else if ( ( $("div.dialog.alert").length || $("#hold-found1").length || $("#hold-found2").length ) && !continue_processing) {
+  } else if ( ( $("#transfer-trigger").length || $("#restricted_backdated").length || $("#ret_badbarcode").length || $("#ret_ispermenant").length || $("#ret_blocked").length || $("#ret_refund").length || $("#ret_charged").length || $("#ret_restored").length || $("#ret_withdrawn").length || $("#ret_datacorrupt").length || $("#ret_checkinmsg").length || $("#wrong-branch-modal").length || $("#hold-found1").length || $("#item-transfer-modal").length || $("#hold-found2").length ) && !continue_processing) {
     if (action != "renew") {
       console.log("NEEDS ALERT CONFIRMATION");
       const message = $("div.dialog.alert");
@@ -122,7 +117,7 @@ function handle_one_at_a_time(
         submit_form_automatically,
       );
     } else {
-      // We have no unprocessed barcodes, let's look for some on the RFID pad
+      // We have no unprocessed barcodes, let us look for some on the RFID pad
 
       poll_rfid_for_barcodes_batch(function (data) {
         let unprocessed_barcodes = get_unprocessed_barcodes();
@@ -267,13 +262,16 @@ function detect_and_handle_rfid_for_page(data) {
           },
         );
         break;
+      case "transfer":
+        handle_one_at_a_time(current_action, "disable");
+        break;
       default:
         console.log(`ERROR: Action ${action} has no handler!`);
     }
   }
 }
 
-// We've gone from one action to another
+// We have gone from one action to another
 // e.g. from checkout to checkin, or batch checkout to batch item modifer
 // Clear out the queued up barcodes and start fresh
 function handle_action_change(action) {
@@ -308,10 +306,12 @@ function get_current_action() {
   } else if (href.indexOf("batchMod.pl") > -1) {
     return "batch_item_modification";
   } else if ($("#barcodelist").length && href.indexOf("inventory.pl") > -1) {
-    return "batch_item_modification";
+    return "inventory";
   } else if (href.indexOf("spinelabel-home.pl") > -1) {
     return "quick-spine-label";
-  }
+  } else if (href.indexOf("branchtransfers.pl") > -1) {
+    return "transfer";
+  }  
 }
 
 function set_previous_action(action) {
@@ -447,7 +447,7 @@ function combine_barcodes(
     "COMBINED UNPROCESSED AND RFID PAD BARCODES: ",
     combined_barcodes,
   );
-  // Then remove out any barcodes we've already seen
+  // Then remove out any barcodes we have already seen
   combined_barcodes = combined_barcodes.filter(
     (el) => !processed_barcodes.includes(el),
   );
@@ -537,7 +537,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
         // We have at least one item on the pad
         if (items_count > 0 && items_count == data.items.length) {
           // No more items have been added since the last check
-          // so it's time to process the stack of items.
+          // so it is time to process the stack of items.
           clearInterval(intervalID);
           console.log(
             "ITEMS HAVE SETTLED, FINISHED WAITING, INITIATING CALLBACK",
