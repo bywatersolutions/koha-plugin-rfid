@@ -48,16 +48,17 @@ function handle_one_at_a_time(
 ) {
   console.log("handle_one_at_a_time");
 
-  var $button = $('<button>', {
-    style: 'position: fixed; bottom: 20px; right: 20px; background-color: red; color: white; font-weight: bold',
-    id: 'rfid-reset-button',
-    text: 'Reset RFID',
-    click: function() {
+  var $button = $("<button>", {
+    style:
+      "position: fixed; bottom: 20px; right: 20px; background-color: red; color: white; font-weight: bold",
+    id: "rfid-reset-button",
+    text: "Reset RFID",
+    click: function () {
       handle_action_change("");
       initiate_rfid_scanning();
-    }
+    },
   });
-  $('body').append($button);
+  $("body").append($button);
 
   barcode_input = barcode_input ? barcode_input : $("#barcode");
   form_submit = form_submit
@@ -77,7 +78,24 @@ function handle_one_at_a_time(
       continue_processing = true;
       initiate_rfid_scanning();
     });
-  } else if ( ( $("#transfer-trigger").length || $("#restricted_backdated").length || $("#ret_badbarcode").length || $("#ret_ispermenant").length || $("#ret_blocked").length || $("#ret_refund").length || $("#ret_charged").length || $("#ret_restored").length || $("#ret_withdrawn").length || $("#ret_datacorrupt").length || $("#ret_checkinmsg").length || $("#wrong-branch-modal").length || $("#hold-found1").length || $("#item-transfer-modal").length || $("#hold-found2").length ) && !continue_processing) {
+  } else if (
+    ($("#transfer-trigger").length ||
+      $("#restricted_backdated").length ||
+      $("#ret_badbarcode").length ||
+      $("#ret_ispermenant").length ||
+      $("#ret_blocked").length ||
+      $("#ret_refund").length ||
+      $("#ret_charged").length ||
+      $("#ret_restored").length ||
+      $("#ret_withdrawn").length ||
+      $("#ret_datacorrupt").length ||
+      $("#ret_checkinmsg").length ||
+      $("#wrong-branch-modal").length ||
+      $("#hold-found1").length ||
+      $("#item-transfer-modal").length ||
+      $("#hold-found2").length) &&
+    !continue_processing
+  ) {
     if (action != "renew") {
       console.log("NEEDS ALERT CONFIRMATION");
       const message = $("div.dialog.alert");
@@ -311,7 +329,7 @@ function get_current_action() {
     return "quick-spine-label";
   } else if (href.indexOf("branchtransfers.pl") > -1) {
     return "transfer";
-  }  
+  }
 }
 
 function set_previous_action(action) {
