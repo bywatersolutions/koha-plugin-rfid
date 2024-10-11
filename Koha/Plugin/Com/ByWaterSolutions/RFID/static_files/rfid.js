@@ -40,7 +40,7 @@ $(document).ready(function () {
       security_setting,
       barcode_input,
       form_submit,
-      auto_submit_test_cb,
+      auto_submit_test_cb
     );
   });
 
@@ -52,7 +52,7 @@ function handle_one_at_a_time(
   security_setting,
   barcode_input,
   form_submit,
-  submit_form_automatically,
+  submit_form_automatically
 ) {
   console.log("handle_one_at_a_time");
 
@@ -77,34 +77,34 @@ function handle_one_at_a_time(
     ? form_submit
     : barcode_input.closest("form").find(":submit");
 
-      const dialog_alert_message = $("div.dialog.alert");
+  const dialog_alert_message = $("div.dialog.alert");
 
-      //TODO: Make this list configurable from the plugin interface
-    if (
-      $("#hold-found1").length ||
-      $("#hold-found2").length)
-      $("#item-transfer-modal").length ||
-      $("#restricted_backdated").length ||
-      $("#transfer-trigger").length ||
-      $("#wrong-branch-modal").length ||
-      $("p.problem.ret_badbarcode").length ||
-      $("p.problem.ret_blocked").length ||
-      $("p.problem.ret_charged").length ||
-      $("p.problem.ret_datacorrupt").length ||
-      $("p.problem.ret_ispermenant").length ||
-      $("p.problem.ret_refund").length ||
-      $("p.problem.ret_restored").length ||
-      $("p.problem.ret_withdrawn").length ||
-      $("p.ret_checkinmsg").length ||
-    { 
-halt = true;
-    }
+  //TODO: Make this list configurable from the plugin interface
+  if (
+    $("#hold-found1").length ||
+    $("#hold-found2").length ||
+    $("#item-transfer-modal").length ||
+    $("#restricted_backdated").length ||
+    $("#transfer-trigger").length ||
+    $("#wrong-branch-modal").length ||
+    $("p.problem.ret_badbarcode").length ||
+    $("p.problem.ret_blocked").length ||
+    $("p.problem.ret_charged").length ||
+    $("p.problem.ret_datacorrupt").length ||
+    $("p.problem.ret_ispermenant").length ||
+    $("p.problem.ret_refund").length ||
+    $("p.problem.ret_restored").length ||
+    $("p.problem.ret_withdrawn").length ||
+    $("p.ret_checkinmsg").length
+  ) {
+    halt = true;
+  }
 
-      if ( action == "renew"  && $('button.approve').length ) {
-	      console.log("HALTING FOR RENEWAL APPROVAL");
-	      halt = true;
-              show_continue_processing_button = false;
-      }
+  if (action == "renew" && $("button.approve").length) {
+    console.log("HALTING FOR RENEWAL APPROVAL");
+    halt = true;
+    show_continue_processing_button = false;
+  }
 
   if ($("#wrong-transfer-modal").length && !continue_processing) {
     console.log("WRONG TRANSFER");
@@ -119,24 +119,23 @@ halt = true;
       continue_processing = true;
       initiate_rfid_scanning();
     });
-  } else if ( halt && !continue_processing ) {
-
-	      console.log("HALTING FOR PROBLEM MESSAGE");
-	  if ( show_continue_processing_button ) {
-	      const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
-	      dialog_alert_message.append(btn);
-	      dialog_alert_message.on("click", "button.rfid-continue", function () {
-		$("button.rfid-continue").hide();
-		continue_processing = true;
-		handle_one_at_a_time(
-		  action,
-		  security_setting,
-		  barcode_input,
-		  form_submit,
-		  submit_form_automatically,
-		);
-	      });
-	}
+  } else if (halt && !continue_processing) {
+    console.log("HALTING FOR PROBLEM MESSAGE");
+    if (show_continue_processing_button) {
+      const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
+      dialog_alert_message.append(btn);
+      dialog_alert_message.on("click", "button.rfid-continue", function () {
+        $("button.rfid-continue").hide();
+        continue_processing = true;
+        handle_one_at_a_time(
+          action,
+          security_setting,
+          barcode_input,
+          form_submit,
+          submit_form_automatically
+        );
+      });
+    }
   } else if (barcode_input.length) {
     // For one at a time pages, we can keep processing the current unproccessed items
     // once that list is empty we go looking for more items on the RFID pad
@@ -154,7 +153,7 @@ halt = true;
         security_setting,
         barcode_input,
         form_submit,
-        submit_form_automatically,
+        submit_form_automatically
       );
     } else {
       // We have no unprocessed barcodes, let us look for some on the RFID pad
@@ -173,7 +172,7 @@ halt = true;
         let combined_barcodes = combine_barcodes(
           rfid_pad_barcodes,
           unprocessed_barcodes,
-          processed_barcodes,
+          processed_barcodes
         );
         console.log("COMBINED BARCODES: ", combined_barcodes);
 
@@ -188,7 +187,7 @@ halt = true;
             security_setting,
             barcode_input,
             form_submit,
-            submit_form_automatically,
+            submit_form_automatically
           );
         } else {
           console.log("NO BARCODE TO PROCESS");
@@ -206,7 +205,7 @@ function set_security_and_submit_single_barcode(
   security_setting,
   barcode_input,
   form_submit,
-  submit_form_automatically,
+  submit_form_automatically
 ) {
   barcode_input.val(barcode);
   if (security_setting == "enable" || security_setting == "disable") {
@@ -215,7 +214,7 @@ function set_security_and_submit_single_barcode(
     const r = alter_security_bits([barcode], security_flag_value).then(
       function () {
         form_submit.click();
-      },
+      }
     );
   } else {
     // No change in RFID security bits
@@ -277,7 +276,7 @@ function detect_and_handle_rfid_for_page(data) {
           "",
           function () {
             return false;
-          },
+          }
         );
         break;
       case "inventory":
@@ -288,7 +287,7 @@ function detect_and_handle_rfid_for_page(data) {
           "",
           function () {
             return false;
-          },
+          }
         );
         break;
       case "quick-spine-label":
@@ -299,7 +298,7 @@ function detect_and_handle_rfid_for_page(data) {
           "",
           function () {
             return false;
-          },
+          }
         );
         break;
       case "transfer":
@@ -365,14 +364,14 @@ function get_previous_action() {
 function set_unprocessed_barcodes(barcodes) {
   return localStorage.setItem(
     "koha_plugin_rfid_circit_unprocessed_barcodes",
-    JSON.stringify(barcodes),
+    JSON.stringify(barcodes)
   );
 }
 
 function get_unprocessed_barcodes() {
   console.log("get_unprocessed_barcodes");
   const barcodes_json = localStorage.getItem(
-    "koha_plugin_rfid_circit_unprocessed_barcodes",
+    "koha_plugin_rfid_circit_unprocessed_barcodes"
   );
   console.log("UNPROCESSED BARCODES JSON: ", barcodes_json);
   let barcodes = barcodes_json ? JSON.parse(barcodes_json) : [];
@@ -382,7 +381,7 @@ function get_unprocessed_barcodes() {
 function get_processed_barcodes() {
   console.log("get_processed_barcodes");
   const barcodes_json = localStorage.getItem(
-    "koha_plugin_rfid_circit_processed_barcodes",
+    "koha_plugin_rfid_circit_processed_barcodes"
   );
   console.log("PROCESSED BARCODES JSON: ", barcodes_json);
   let barcodes = barcodes_json ? JSON.parse(barcodes_json) : [];
@@ -392,7 +391,7 @@ function get_processed_barcodes() {
 function set_processed_barcodes(barcodes) {
   return localStorage.setItem(
     "koha_plugin_rfid_circit_processed_barcodes",
-    JSON.stringify(barcodes),
+    JSON.stringify(barcodes)
   );
 }
 
@@ -413,7 +412,7 @@ function handle_one_and_done(
   security_setting,
   barcode_input,
   form_submit,
-  auto_submit_test_cb,
+  auto_submit_test_cb
 ) {
   console.log("handle_one_and_done");
 
@@ -431,14 +430,14 @@ function handle_one_and_done(
 
       if (barcodes.length > 1) {
         alert(
-          "More than one RFID tag is on the reader. Please remove all but one RFID tag and click 'OK'",
+          "More than one RFID tag is on the reader. Please remove all but one RFID tag and click 'OK'"
         );
         handle_one_and_done(
           action,
           security_setting,
           barcode_input,
           form_submit,
-          auto_submit_test_cb,
+          auto_submit_test_cb
         );
       } else {
         barcode_input.val(barcodes[0]);
@@ -448,7 +447,7 @@ function handle_one_and_done(
               action,
               security_setting,
               barcode_input,
-              form_submit,
+              form_submit
             )
           : true;
 
@@ -460,7 +459,7 @@ function handle_one_and_done(
               if (submit_form_automatically) {
                 form_submit.click();
               }
-            },
+            }
           );
         } else {
           // No change in RFID security bits
@@ -476,20 +475,20 @@ function handle_one_and_done(
 function combine_barcodes(
   rfid_pad_barcodes,
   unprocessed_barcodes,
-  processed_barcodes,
+  processed_barcodes
 ) {
   console.log("combine_barcodes");
   // Add the barcodes on the rfid pad to the currently uprocessed barcode
   let combined_barcodes = unprocessed_barcodes.concat(
-    rfid_pad_barcodes.filter((item) => unprocessed_barcodes.indexOf(item) < 0),
+    rfid_pad_barcodes.filter(item => unprocessed_barcodes.indexOf(item) < 0)
   );
   console.log(
     "COMBINED UNPROCESSED AND RFID PAD BARCODES: ",
-    combined_barcodes,
+    combined_barcodes
   );
   // Then remove out any barcodes we have already seen
   combined_barcodes = combined_barcodes.filter(
-    (el) => !processed_barcodes.includes(el),
+    el => !processed_barcodes.includes(el)
   );
   console.log("COMBINED BARCODES WITH PROCESSED BARCODES REMOVED");
 
@@ -501,7 +500,7 @@ function handle_batch(
   security_setting,
   barcodes_textarea,
   form_submit,
-  auto_submit_test_cb,
+  auto_submit_test_cb
 ) {
   console.log("handle_batch");
 
@@ -525,7 +524,7 @@ function handle_batch(
             action,
             security_setting,
             barcodes_textarea,
-            form_submit,
+            form_submit
           )
         : true;
 
@@ -536,7 +535,7 @@ function handle_batch(
             if (submit_form_automatically) {
               form_submit.click();
             }
-          },
+          }
         );
       } else {
         // No change in RFID security bits
@@ -550,7 +549,7 @@ function handle_batch(
 
 let alter_security_bits = async (barcodes, bit_value) => {
   console.log("alter_security_bits", barcodes, bit_value);
-  barcodes.forEach((each) =>
+  barcodes.forEach(each =>
     $.ajax({
       url: `${circit_address}/setsecurity/${each}/${bit_value}`,
       dataType: "json",
@@ -562,7 +561,7 @@ let alter_security_bits = async (barcodes, bit_value) => {
       failure: function () {
         result = false;
       },
-    }),
+    })
   );
 };
 
@@ -580,7 +579,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
           // so it is time to process the stack of items.
           clearInterval(intervalID);
           console.log(
-            "ITEMS HAVE SETTLED, FINISHED WAITING, INITIATING CALLBACK",
+            "ITEMS HAVE SETTLED, FINISHED WAITING, INITIATING CALLBACK"
           );
           cb(data);
         } else {
