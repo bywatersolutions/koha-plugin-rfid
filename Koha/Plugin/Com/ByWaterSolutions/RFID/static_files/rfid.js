@@ -12,25 +12,28 @@ let intervalID = "";
 $(document).ready(function () {
   initiate_rfid_scanning();
 
+  // Checkin option on the top bar
   $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
     handle_action_change("checkin");
     handle_one_at_a_time("checkin", "enable", $("#ret_barcode"));
   });
 
+  // Renewal option on the top bar
   $("#renew_search-tab,a[href='#renew_search']").on("click", function () {
     handle_action_change("renew");
     handle_one_at_a_time("checkin", "enable", $("#ren_barcode"));
   });
 
+  // Catalog search on the top bar
   $("#catalog_search-tab").on("click", function () {
     handle_action_change("search");
 
     let action = "search";
     let security_setting = "ignore";
     let barcode_input = $("#search-form");
-    let form_submit;
+    let form_submit = $("#cat-search-block button");
     let auto_submit_test_cb = () => {
-      return false;
+      return true; //FIXME: Make a plugin setting
     };
     handle_one_and_done(
       action,
@@ -53,6 +56,7 @@ function handle_one_at_a_time(
 ) {
   console.log("handle_one_at_a_time");
 
+  // Add a button to the buttom right to "reset" the list of seen barcodes
   var $button = $("<button>", {
     style:
       "position: fixed; bottom: 20px; right: 20px; background-color: red; color: white; font-weight: bold",
@@ -65,10 +69,42 @@ function handle_one_at_a_time(
   });
   $("body").append($button);
 
+  // Some dialogs have their own buttons and the "Continue processing" button is not needed
+  let show_continue_processing_button = true;
+
   barcode_input = barcode_input ? barcode_input : $("#barcode");
   form_submit = form_submit
     ? form_submit
     : barcode_input.closest("form").find(":submit");
+
+      const dialog_alert_message = $("div.dialog.alert");
+
+      //TODO: Make this list configurable from the plugin interface
+    if (
+      $("#hold-found1").length ||
+      $("#hold-found2").length)
+      $("#item-transfer-modal").length ||
+      $("#restricted_backdated").length ||
+      $("#transfer-trigger").length ||
+      $("#wrong-branch-modal").length ||
+      $("p.problem.ret_badbarcode").length ||
+      $("p.problem.ret_blocked").length ||
+      $("p.problem.ret_charged").length ||
+      $("p.problem.ret_datacorrupt").length ||
+      $("p.problem.ret_ispermenant").length ||
+      $("p.problem.ret_refund").length ||
+      $("p.problem.ret_restored").length ||
+      $("p.problem.ret_withdrawn").length ||
+      $("p.ret_checkinmsg").length ||
+    { 
+halt = true;
+    }
+
+      if ( action == "renew"  && $('button.approve').length ) {
+	      console.log("HALTING FOR RENEWAL APPROVAL");
+	      halt = true;
+              show_continue_processing_button = false;
+      }
 
   if ($("#wrong-transfer-modal").length && !continue_processing) {
     console.log("WRONG TRANSFER");
@@ -83,43 +119,24 @@ function handle_one_at_a_time(
       continue_processing = true;
       initiate_rfid_scanning();
     });
-  } else if (
-    ($("#transfer-trigger").length ||
-      $("#restricted_backdated").length ||
-      $("#ret_badbarcode").length ||
-      $("#ret_ispermenant").length ||
-      $("#ret_blocked").length ||
-      $("#ret_refund").length ||
-      $("#ret_charged").length ||
-      $("#ret_restored").length ||
-      $("#ret_withdrawn").length ||
-      $("#ret_datacorrupt").length ||
-      $("#ret_checkinmsg").length ||
-      $("#wrong-branch-modal").length ||
-      $("#hold-found1").length ||
-      $("#item-transfer-modal").length ||
-      $("#hold-found2").length) &&
-    !continue_processing
-  ) {
-    if (action != "renew") {
-      console.log("NEEDS ALERT CONFIRMATION");
-      const message = $("div.dialog.alert");
+  } else if ( halt && !continue_processing ) {
 
-      //FIXME: Show this button only when necessary
-      const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
-      message.append(btn);
-      message.on("click", "button.rfid-continue", function () {
-        $("button.rfid-continue").hide();
-        continue_processing = true;
-        handle_one_at_a_time(
-          action,
-          security_setting,
-          barcode_input,
-          form_submit,
-          submit_form_automatically,
-        );
-      });
-    }
+	      console.log("HALTING FOR PROBLEM MESSAGE");
+	  if ( show_continue_processing_button ) {
+	      const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
+	      dialog_alert_message.append(btn);
+	      dialog_alert_message.on("click", "button.rfid-continue", function () {
+		$("button.rfid-continue").hide();
+		continue_processing = true;
+		handle_one_at_a_time(
+		  action,
+		  security_setting,
+		  barcode_input,
+		  form_submit,
+		  submit_form_automatically,
+		);
+	      });
+	}
   } else if (barcode_input.length) {
     // For one at a time pages, we can keep processing the current unproccessed items
     // once that list is empty we go looking for more items on the RFID pad
