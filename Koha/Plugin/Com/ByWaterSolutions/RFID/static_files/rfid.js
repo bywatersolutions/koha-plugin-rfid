@@ -271,6 +271,8 @@ function detect_and_handle_rfid_for_page(data) {
         });
         break;
       case "batch_item_modification":
+        // Reset the seen items for each batch run
+        handle_action_change(current_action);
         handle_batch(
           current_action,
           "ignore",
@@ -399,8 +401,14 @@ function set_processed_barcodes(barcodes) {
 
 function add_processed_barcode(barcode) {
   let barcodes = get_processed_barcodes();
-  barcodes.push(barcode);
-  set_processed_barcodes(barcodes);
+
+  if (barcodes.includes(barcode)) {
+    return false;
+  } else {
+    barcodes.push(barcode);
+    set_processed_barcodes(barcodes);
+    return true;
+  }
 }
 
 function display_rfid_failure() {
@@ -515,11 +523,22 @@ function handle_batch(
       let barcodes = data.items.map(function (item) {
         return item.barcode;
       });
-      console.log("BARCODES: ", barcodes);
+
       if (!form_submit) {
         form_submit = barcodes_textarea.closest("form").find(":submit");
       }
-      barcodes_textarea.val(barcodes.join("\r\n"));
+
+      // The function add_processed_barcode will return false if the barcode has already been added to the processed list
+      let unseen_barcodes = [];
+      for (const b of barcodes) {
+        if (add_processed_barcode(b)) {
+          unseen_barcodes.push(b);
+        }
+      }
+
+      barcodes_textarea.val(
+        barcodes_textarea.val() + unseen_barcodes.join("\r\n") + "\r\n"
+      );
 
       const submit_form_automatically = auto_submit_test_cb
         ? auto_submit_test_cb(
@@ -536,6 +555,15 @@ function handle_batch(
           function () {
             if (submit_form_automatically) {
               form_submit.click();
+            } else {
+              // Start looking for more barcodes, allows multiple stacks of items to be dropped on rfid pad in turn
+              handle_batch(
+                action,
+                security_setting,
+                barcodes_textarea,
+                form_submit,
+                auto_submit_test_cb
+              );
             }
           }
         );
@@ -543,6 +571,15 @@ function handle_batch(
         // No change in RFID security bits
         if (submit_form_automatically) {
           form_submit.click();
+        } else {
+          // Start looking for more barcodes, allows multiple stacks of items to be dropped on rfid pad in turn
+          handle_batch(
+            action,
+            security_setting,
+            barcodes_textarea,
+            form_submit,
+            auto_submit_test_cb
+          );
         }
       }
     });
