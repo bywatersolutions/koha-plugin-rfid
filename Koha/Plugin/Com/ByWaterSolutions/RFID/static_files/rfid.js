@@ -69,6 +69,8 @@ function handle_one_at_a_time(
   });
   $("body").append($button);
 
+  let halt = false;
+
   // Some dialogs have their own buttons and the "Continue processing" button is not needed
   let show_continue_processing_button = true;
 
