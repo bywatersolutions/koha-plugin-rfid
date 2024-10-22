@@ -9,18 +9,8 @@ const circit_address = `http://localhost:${circit_port}`;
 let continue_processing = false;
 let intervalID = "";
 
-function is_blocked_script() {
-  const url = window.location.href;
-
-  const blocked_scripts = ["circ/hold-transfer-slip.pl"];
-
-  return blocked_scripts.some(script => url.includes(script));
-}
-
 $(document).ready(function () {
   initiate_rfid_scanning();
-
-  if (is_blocked_url()) return;
 
   // Checkin option on the top bar
   $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
