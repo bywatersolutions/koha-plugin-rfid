@@ -10,8 +10,6 @@ let continue_processing = false;
 let intervalID = "";
 
 $(document).ready(function () {
-  initiate_rfid_scanning();
-
   // Checkin option on the top bar
   $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
     handle_action_change("checkin");
@@ -44,8 +42,28 @@ $(document).ready(function () {
     );
   });
 
-  //TODO: Should we restart rfid scanning ( initiate_rfid_scanning ) somehow? Or just require reloading the page?
+  handle_visibility();
 });
+
+function handle_tab_inactive() {
+  if (intervalID) {
+    clearInterval(intervalID);
+    intervalID = null;
+  }
+}
+
+function handle_tab_active() {
+  initiate_rfid_scanning();
+}
+
+function handle_visibility() {
+  if (document.hidden) {
+    handle_tab_inactive();
+  } else {
+    handle_tab_active();
+  }
+}
+document.addEventListener("visibilitychange", handle_visibility);
 
 function handle_one_at_a_time(
   action,
