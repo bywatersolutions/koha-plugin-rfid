@@ -14,6 +14,16 @@ my $config = {
     barcodes => {},
 };
 
+# CORS
+app->hook(after_dispatch => sub {
+    my $c = shift;
+    my $headers = $c->res->headers;
+
+    $headers->header('Access-Control-Allow-Origin'  => '*');
+    $headers->header('Access-Control-Allow-Methods' => 'GET, OPTIONS, POST, DELETE, PUT');
+    $headers->header('Access-Control-Allow-Headers' => 'Content-Type, application/x-www-form-urlencoded');
+});
+
 # Helper to set barcodes
 helper set_barcodes => sub ($c, $barcodes) {
     my @b = split /\s+/, $barcodes;
