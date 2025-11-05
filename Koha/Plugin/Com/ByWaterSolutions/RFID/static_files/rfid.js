@@ -5,6 +5,34 @@ const circit_port = TechLogicCircItNonAdministrativeMode
     : "9201";
 const circit_address = `http://localhost:${circit_port}`;
 
+/**
+ * Detects if the RFID reader is a TechLogic CircIt device by checking the /alive endpoint
+ * @returns {Promise<boolean>} Resolves to true if the endpoint responds with status 200 and valid JSON
+ */
+async function detect_rfid_type_techlogic_ciric() {
+    try {
+        const response = await fetch(`${circit_address}/alive`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        if (!response.ok) {
+            console.log('TechLogic CircIt detection: Endpoint responded with status', response.status);
+            return false;
+        }
+        
+        const data = await response.json();
+        const isAlive = data && data.status === true && data.statuscode === 0;
+        console.log('TechLogic CircIt detection:', isAlive ? 'Found' : 'Not found');
+        return isAlive;
+    } catch (error) {
+        console.error('TechLogic CircIt detection failed:', error);
+        r
+}
+
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
 let continue_processing = false;
 let intervalID = "";
