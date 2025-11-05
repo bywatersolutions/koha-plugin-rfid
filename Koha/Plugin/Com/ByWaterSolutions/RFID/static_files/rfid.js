@@ -1,11 +1,19 @@
 console.log("RFID Plugin loaded");
 
-// Override the set_unprocessed_barcodes function to update the UI
+// Override storage functions to update the UI
 const originalSetUnprocessedBarcodes = set_unprocessed_barcodes;
 set_unprocessed_barcodes = function(barcodes) {
     originalSetUnprocessedBarcodes(barcodes);
     if ($('#rfid-barcode-list').length) {
         updateBarcodeList();
+    }
+};
+
+const originalSetProcessedBarcodes = set_processed_barcodes;
+set_processed_barcodes = function(barcodes) {
+    originalSetProcessedBarcodes(barcodes);
+    if ($('#rfid-processed-barcode-list').length) {
+        updateProcessedBarcodeList();
     }
 };
 
@@ -706,8 +714,8 @@ function initFloatingBarcodeBox() {
             position: fixed;
             bottom: 20px;
             left: 20px;
-            width: 300px;
-            max-height: 400px;
+            width: 350px;
+            max-height: 500px;
             background: white;
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -726,7 +734,7 @@ function initFloatingBarcodeBox() {
                 align-items: center;
                 cursor: move;
             ">
-                <strong>Unprocessed Barcodes</strong>
+                <strong>RFID Barcodes</strong>
                 <div>
                     <button id="rfid-box-toggle" style="
                         background: none;
@@ -745,12 +753,47 @@ function initFloatingBarcodeBox() {
                     ">×</button>
                 </div>
             </div>
-            <div id="rfid-barcode-list" style="
-                padding: 10px;
-                overflow-y: auto;
-                flex-grow: 1;
-            ">
-                <div class="text-muted text-center py-2">No unprocessed barcodes</div>
+            
+            <!-- Tabs -->
+            <div class="nav nav-tabs" id="barcodeTabs" role="tablist" style="padding: 5px 10px 0; border-bottom: none;">
+                <button class="nav-link active" id="unprocessed-tab" data-bs-toggle="tab" data-bs-target="#unprocessed-content" type="button" role="tab" style="
+                    padding: 5px 10px;
+                    border: 1px solid #dee2e6;
+                    border-bottom: none;
+                    border-radius: 4px 4px 0 0;
+                    background: #fff;
+                    color: #495057;
+                    margin-right: 5px;
+                ">
+                    Unprocessed <span id="unprocessed-count" class="badge bg-primary rounded-pill">0</span>
+                </button>
+                <button class="nav-link" id="processed-tab" data-bs-toggle="tab" data-bs-target="#processed-content" type="button" role="tab" style="
+                    padding: 5px 10px;
+                    border: 1px solid #dee2e6;
+                    border-bottom: none;
+                    border-radius: 4px 4px 0 0;
+                    background: #f8f9fa;
+                    color: #495057;
+                ">
+                    Processed <span id="processed-count" class="badge bg-secondary rounded-pill">0</span>
+                </button>
+            </div>
+            
+            <!-- Tab content -->
+            <div class="tab-content" style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column;">
+                <!-- Unprocessed barcodes tab -->
+                <div class="tab-pane fade show active" id="unprocessed-content" role="tabpanel" style="flex-grow: 1; overflow-y: auto;">
+                    <div id="rfid-barcode-list" style="padding: 10px;">
+                        <div class="text-muted text-center py-2">No unprocessed barcodes</div>
+                    </div>
+                </div>
+                
+                <!-- Processed barcodes tab -->
+                <div class="tab-pane fade" id="processed-content" role="tabpanel" style="flex-grow: 1; overflow-y: auto;">
+                    <div id="rfid-processed-barcode-list" style="padding: 10px;">
+                        <div class="text-muted text-center py-2">No processed barcodes</div>
+                    </div>
+                </div>
             </div>
         </div>
     `);
@@ -791,13 +834,15 @@ function initFloatingBarcodeBox() {
     // Toggle visibility
     $('#rfid-box-toggle').on('click', function() {
         const $list = $('#rfid-barcode-list');
+      console.log("TEST TEST TEEST TEST")
         if ($list.is(':visible')) {
+          console.log("HIDING");
             $list.hide();
             $(this).text('+');
-            $barcode_box.remove();
             // Store preference to not show again
             localStorage.setItem('koha_plugin_rfid_show_barcode_box', 'false');
         } else {
+          console.log("SHOWING");
             $list.show();
             $(this).text('−');
         }
@@ -806,16 +851,21 @@ function initFloatingBarcodeBox() {
     // Close button
     $('#rfid-box-close').on('click', function() {
       //FIXME: Add a way to remove the floating box and bring it back later
+      //$barcode_box.remove();
     });
 
-    // Initial update
+    // Initial updates
     updateBarcodeList();
+    updateProcessedBarcodeList();
 }
 
-// Update the barcode list in the floating box
+// Update the unprocessed barcode list in the floating box
 function updateBarcodeList() {
     const barcodes = get_unprocessed_barcodes();
     const $list = $('#rfid-barcode-list');
+    
+    // Update count badge
+    $('#unprocessed-count').text(barcodes.length);
     
     if (!barcodes || barcodes.length === 0) {
         $list.html('<div class="text-muted text-center py-2">No unprocessed barcodes</div>');
@@ -827,7 +877,10 @@ function updateBarcodeList() {
             ${barcodes.map(barcode => `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
                     <span class="font-monospace">${barcode}</span>
-                    <button class="btn btn-sm btn-outline-danger remove-barcode" data-barcode="${barcode}">×</button>
+                    <div>
+                        <button class="btn btn-sm btn-outline-success process-barcode" data-barcode="${barcode}" title="Mark as processed">✓</button>
+                        <button class="btn btn-sm btn-outline-danger remove-barcode" data-barcode="${barcode}" title="Remove">×</button>
+                    </div>
                 </div>
             `).join('')}
         </div>
@@ -836,11 +889,54 @@ function updateBarcodeList() {
     $list.html(html);
     
     // Add click handler for remove buttons
-    $('.remove-barcode').on('click', function() {
+    $('.remove-barcode').on('click', function(e) {
+        e.stopPropagation();
         const barcodeToRemove = $(this).data('barcode');
         const currentBarcodes = get_unprocessed_barcodes();
         const updatedBarcodes = currentBarcodes.filter(b => b !== barcodeToRemove);
         set_unprocessed_barcodes(updatedBarcodes);
         updateBarcodeList();
     });
+    
+    // Add click handler for process buttons
+    $('.process-barcode').on('click', function(e) {
+        e.stopPropagation();
+        const barcodeToProcess = $(this).data('barcode');
+        const currentUnprocessed = get_unprocessed_barcodes();
+        const updatedUnprocessed = currentUnprocessed.filter(b => b !== barcodeToProcess);
+        set_unprocessed_barcodes(updatedUnprocessed);
+        add_processed_barcode(barcodeToProcess);
+        updateBarcodeList();
+        updateProcessedBarcodeList();
+    });
+}
+
+// Update the processed barcode list in the floating box
+function updateProcessedBarcodeList() {
+    const barcodes = get_processed_barcodes();
+    const $list = $('#rfid-processed-barcode-list');
+    
+    // Update count badge
+    $('#processed-count').text(barcodes.length);
+    
+    if (!barcodes || barcodes.length === 0) {
+        $list.html('<div class="text-muted text-center py-2">No processed barcodes</div>');
+        return;
+    }
+    
+    // Show most recently processed items first
+    const reversedBarcodes = [...barcodes].reverse();
+    
+    const html = `
+        <div class="list-group" style="max-height: 350px; overflow-y: auto;">
+            ${reversedBarcodes.map(barcode => `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="font-monospace">${barcode}</span>
+                    <span class="badge bg-success">Processed</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    $list.html(html);
 }
