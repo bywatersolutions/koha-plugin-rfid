@@ -1,5 +1,7 @@
 console.log("RFID Plugin loaded");
-const debugTimeout = 5000;
+const debugTimeout = 0; // timout in milliseconds, 0 to disabled
+
+let rfid_type = undefined;
 
 // Override storage functions to update the UI
 const originalSetUnprocessedBarcodes = set_unprocessed_barcodes;
@@ -25,40 +27,27 @@ const circit_port = TechLogicCircItNonAdministrativeMode
     : "9201";
 const circit_address = `http://localhost:${circit_port}`;
 
-/**
- * Detects if the RFID reader is a TechLogic CircIt device by checking the /alive endpoint
- * @returns {Promise<boolean>} Resolves to true if the endpoint responds with status 200 and valid JSON
- */
-async function detect_rfid_type_techlogic_circit() {
-    try {
-        const response = await fetch(`${circit_address}/alive`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-            }
-        });
-        
-        if (!response.ok) {
-            console.log('TechLogic CircIt detection: Endpoint responded with status', response.status);
-            return false;
-        }
-        
-        const data = await response.json();
-        const isAlive = data && data.status === true && data.statuscode === 0;
-        console.log('TechLogic CircIt detection:', isAlive ? 'Found' : 'Not found');
-        return isAlive;
-    } catch (error) {
-        console.error('TechLogic CircIt detection failed:', error);
-        return false;
+async function detect_rfid_interface() {
+    const is_circit = await detect_rfid_type_techlogic_circit();
+    if (is_circit) {
+        console.log('TechLogic CircIt detected');
+        return 'techlogic_circit';
+    } else {
+        console.log('TechLogic CircIt not detected');
     }
+
+    display_rfid_failure();
+    return undefined;
 }
 
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
 let continue_processing = false;
 let intervalID = "";
 
-$(document).ready(function () {
+$(document).ready(async function () {
+  rfid_type = await detect_rfid_interface();
+  console.log('RFID TYPE: ', rfid_type);
+  
   // Checkin option on the top bar
   $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
     handle_action_change("checkin");
@@ -1065,8 +1054,33 @@ function updateProcessedBarcodeList() {
 
 function sleep(ms) {
     ms = ms || debugTimeout;
-    const start = Date.now();
-    while (Date.now() - start < ms) {
-        // Do nothing
+    if ( ms ) {
+        // This code blocks all javascript
+        const start = Date.now();
+        while (Date.now() - start < ms) {
+            // Do nothing
+        }
+    }
+}
+
+/**
+ * Detects if the RFID reader is a TechLogic CircIt device by checking the /alive endpoint
+ * @returns {Promise<boolean>} Resolves to true if the endpoint responds with status 200 and valid JSON
+ */
+async function detect_rfid_type_techlogic_circit() {
+    try {
+        console.log("FETCHING CIRCIT ALIVE ENDPOINT", `${circit_address}/alive`);
+        const response = await $.getJSON(`${circit_address}/alive`);
+        console.log("CIRCIT ALIVE RESPONSE: ", response);
+
+        if( response.status === true && response.statuscode === 0 ) {
+            return true;
+        } else {
+          console.log("CIRCIT RETURNED UNEXPECTED RESPONSE:", response);
+          return false;
+        }
+    } catch (error) {
+        console.log("CIRCIT RETURNED UNEXPECTED ERROR:", error);
+        return false;
     }
 }
