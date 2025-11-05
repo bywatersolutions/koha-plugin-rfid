@@ -22,6 +22,33 @@ set_processed_barcodes = function(barcodes) {
 // RFID Vendor API abstraction
 const rfidVendor = {
   vendors: {
+    mksolutions: {
+      name: 'mksolutions',
+      baseUrl: null,
+      init: function() {
+      },
+      checkAlive: async function() {
+        try {
+          console.log(`Checking MK Solutions ${this.name} RFID reader status at ${this.baseUrl}/alive`);
+          const response = await $.getJSON(`${this.baseUrl}/alive`);
+          console.log(`${this.name} RFID reader response:`, response);
+          return response.status === true && response.statuscode === 0;
+        } catch (error) {
+          console.log(`${this.name} RFID reader check failed:`, error);
+          return false;
+        }
+      },
+      getItems: function() {
+        return $.getJSON(`${this.baseUrl}/getitems`);
+      },
+      setSecurityBits: function(barcode, bitValue) {
+        return $.ajax({
+          url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
+          dataType: "json",
+          async: false
+        });
+      }
+    },
     circit: {
       name: 'circit',
       port: TechLogicCircItNonAdministrativeMode
@@ -53,33 +80,6 @@ const rfidVendor = {
           async: false
         });
       }
-    },
-    mksolutions: {
-      name: 'mksolutions',
-      baseUrl: null,
-      init: function() {
-      },
-      checkAlive: async function() {
-        try {
-          console.log(`Checking MK Solutions ${this.name} RFID reader status at ${this.baseUrl}/alive`);
-          const response = await $.getJSON(`${this.baseUrl}/alive`);
-          console.log(`${this.name} RFID reader response:`, response);
-          return response.status === true && response.statuscode === 0;
-        } catch (error) {
-          console.log(`${this.name} RFID reader check failed:`, error);
-          return false;
-        }
-      },
-      getItems: function() {
-        return $.getJSON(`${this.baseUrl}/getitems`);
-      },
-      setSecurityBits: function(barcode, bitValue) {
-        return $.ajax({
-          url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
-          dataType: "json",
-          async: false
-        });
-      }
     }
   },
   
@@ -89,12 +89,10 @@ init: async function() {
   // Try to detect which vendor is available
   for (const [vendorName, vendor] of Object.entries(this.vendors)) {
     try {
-      // Initialize the vendor first
-      console.log(vendor);
+      console.log(`Checking ${vendorName}`);
+
       vendor.init();
-      console.log(`Checking ${vendorName} RFID reader status at ${vendor.baseUrl}/alive`);
       
-      // Check if the vendor is alive
       const isAlive = await vendor.checkAlive();
       
       if (isAlive) {
