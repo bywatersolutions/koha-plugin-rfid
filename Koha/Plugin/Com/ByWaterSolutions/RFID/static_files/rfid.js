@@ -1,5 +1,4 @@
 console.log("RFID Plugin loaded");
-const debugTimeout = 0; // timout in milliseconds, 0 to disabled
 
 let rfid_type = undefined;
 
@@ -22,46 +21,116 @@ set_processed_barcodes = function(barcodes) {
 
 // RFID Vendor API abstraction
 const rfidVendor = {
-  // Initialize vendor-specific settings
-  init: function() {
-    this.port = TechLogicCircItNonAdministrativeMode
-      ? "80/Temporary_Listen_Addresses"
-      : TechLogicCircItPort
-        ? TechLogicCircItPort
-        : "9201";
-    this.baseUrl = `http://localhost:${this.port}`;
-  },
-
-  // Check if the RFID reader is alive
-  checkAlive: async function() {
-    try {
-      console.log("Checking RFID reader status at", `${this.baseUrl}/alive`);
-      const response = await $.getJSON(`${this.baseUrl}/alive`);
-      console.log("RFID reader response: ", response);
-      return response.status === true && response.statuscode === 0;
-    } catch (error) {
-      console.log("RFID reader check failed:", error);
-      return false;
+  vendors: {
+    circit: {
+      name: 'circit',
+      port: TechLogicCircItNonAdministrativeMode
+        ? "80/Temporary_Listen_Addresses"
+        : TechLogicCircItPort
+          ? TechLogicCircItPort
+          : "9201",
+      baseUrl: "",
+      init: function() {
+        this.baseUrl = `http://localhost:${this.port}`;
+      },
+      checkAlive: async function() {
+        try {
+          console.log(`Checking CIRCIT ${this.name} RFID reader status at ${this.baseUrl}/alive`);
+          const response = await $.getJSON(`${this.baseUrl}/alive`);
+          return response.status === true && response.statuscode === 0;
+        } catch (error) {
+          console.log(`${this.name} RFID reader check failed:`, error);
+          return false;
+        }
+      },
+      getItems: function() {
+        return $.getJSON(`${this.baseUrl}/getitems`);
+      },
+      setSecurityBits: function(barcode, bitValue) {
+        return $.ajax({
+          url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
+          dataType: "json",
+          async: false
+        });
+      }
+    },
+    mksolutions: {
+      name: 'mksolutions',
+      baseUrl: null,
+      init: function() {
+      },
+      checkAlive: async function() {
+        try {
+          console.log(`Checking MK Solutions ${this.name} RFID reader status at ${this.baseUrl}/alive`);
+          const response = await $.getJSON(`${this.baseUrl}/alive`);
+          console.log(`${this.name} RFID reader response:`, response);
+          return response.status === true && response.statuscode === 0;
+        } catch (error) {
+          console.log(`${this.name} RFID reader check failed:`, error);
+          return false;
+        }
+      },
+      getItems: function() {
+        return $.getJSON(`${this.baseUrl}/getitems`);
+      },
+      setSecurityBits: function(barcode, bitValue) {
+        return $.ajax({
+          url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
+          dataType: "json",
+          async: false
+        });
+      }
     }
   },
-
-  // Get items from the RFID reader
-  getItems: function() {
-    return $.getJSON(`${this.baseUrl}/getitems`);
+  
+  // Initialize the RFID vendor
+init: async function() {
+  console.log("INITIALIZING RFID VENDOR");
+  // Try to detect which vendor is available
+  for (const [vendorName, vendor] of Object.entries(this.vendors)) {
+    try {
+      // Initialize the vendor first
+      console.log(vendor);
+      vendor.init();
+      console.log(`Checking ${vendorName} RFID reader status at ${vendor.baseUrl}/alive`);
+      
+      // Check if the vendor is alive
+      const isAlive = await vendor.checkAlive();
+      
+      if (isAlive) {
+        this.currentVendor = vendor;
+        console.log(`Using ${vendorName} RFID reader at ${vendor.baseUrl}`);
+        return true;
+      }
+    } catch (error) {
+      console.error(`Error initializing ${vendorName}:`, error);
+    }
+  }
+  
+  console.error('No supported RFID reader found');
+  display_rfid_failure();
+  return false;
+},
+  
+  // Proxy methods to the current vendor
+  checkAlive: function() {
+    return this.currentVendor ? this.currentVendor.checkAlive() : Promise.resolve(false);
   },
-
-  // Set security bits for an item
+  
+  getItems: function() {
+    if (!this.currentVendor) {
+      return $.Deferred().reject('No RFID reader available').promise();
+    }
+    return this.currentVendor.getItems();
+  },
+  
   setSecurityBits: function(barcode, bitValue) {
-    return $.ajax({
-      url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
-      dataType: "json",
-      async: false
-    });
+    if (!this.currentVendor) {
+      return $.Deferred().reject('No RFID reader available').promise();
+    }
+    return this.currentVendor.setSecurityBits(barcode, bitValue);
   }
 };
-
-// Initialize the RFID vendor
-rfidVendor.init();
 
 async function detect_rfid_interface() {
     const is_circit = await detect_rfid_type_techlogic_circit();
@@ -81,9 +150,13 @@ let continue_processing = false;
 let intervalID = "";
 
 $(document).ready(async function () {
-  rfid_type = await detect_rfid_interface();
-  console.log('RFID TYPE: ', rfid_type);
-  
+  // Initialize the RFID vendor
+  await rfidVendor.init().then(initialized => {
+    if (!initialized) {
+      display_rfid_failure();
+    }
+  });
+
   // Checkin option on the top bar
   $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
     handle_action_change("checkin");
@@ -299,14 +372,12 @@ function set_security_and_submit_single_barcode(
 
     const r = alter_security_bits([barcode], security_flag_value).then(
       function () {
-        sleep();
         form_submit.click();
       }
     );
   } else {
     // No change in RFID security bits
     if (submit_form_automatically) {
-      sleep();
       form_submit.click();
     }
   }
@@ -502,7 +573,7 @@ function add_processed_barcode(barcode) {
 }
 
 function display_rfid_failure() {
-  console.log("RFID FAILURE");
+  console.log("NO RFID READER FOUND");
 }
 
 // This function is for pages where bacodes cannot be run in batch *or* scanned repeatedly.
@@ -557,7 +628,6 @@ function handle_one_and_done(
           const r = alter_security_bits(barcodes, security_flag_value).then(
             function () {
               if (submit_form_automatically) {
-                sleep();
                 form_submit.click();
               }
             }
@@ -565,7 +635,6 @@ function handle_one_and_done(
         } else {
           // No change in RFID security bits
           if (submit_form_automatically) {
-            sleep();
             form_submit.click();
           }
         }
@@ -646,7 +715,6 @@ function handle_batch(
         const r = alter_security_bits(barcodes, security_flag_value).then(
           function () {
             if (submit_form_automatically) {
-              sleep();
               form_submit.click();
             } else {
               // Start looking for more barcodes, allows multiple stacks of items to be dropped on rfid pad in turn
@@ -663,7 +731,6 @@ function handle_batch(
       } else {
         // No change in RFID security bits
         if (submit_form_automatically) {
-          sleep();
           form_submit.click();
         } else {
           // Start looking for more barcodes, allows multiple stacks of items to be dropped on rfid pad in turn
@@ -1081,32 +1148,4 @@ function updateProcessedBarcodeList() {
     `;
     
     $list.html(html);
-}
-
-function sleep(ms) {
-    ms = ms || debugTimeout;
-    if ( ms ) {
-        // This code blocks all javascript
-        const start = Date.now();
-        while (Date.now() - start < ms) {
-            // Do nothing
-        }
-    }
-}
-
-/**
- * Detects if the RFID reader is a TechLogic CircIt device by checking the /alive endpoint
- * @returns {Promise<boolean>} Resolves to true if the endpoint responds with status 200 and valid JSON
- */
-async function detect_rfid_interface() {
-    const isAlive = await rfidVendor.checkAlive();
-    if (isAlive) {
-        console.log('RFID reader detected and alive');
-        return 'techlogic_circit';
-    } else {
-        console.log('RFID reader not detected or not responding');
-    }
-
-    display_rfid_failure();
-    return undefined;
 }
