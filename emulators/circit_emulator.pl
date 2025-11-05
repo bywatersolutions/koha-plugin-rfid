@@ -103,7 +103,7 @@ __DATA__
 <div class="container mt-5">
     <div class="row">
         <div class="col-md-6">
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-header">
                     <h5>RFID Emulator</h5>
                 </div>
@@ -113,6 +113,33 @@ __DATA__
                         <textarea class="form-control" id="barcodes" rows="10"></textarea>
                     </div>
                     <button id="updateBarcodes" class="btn btn-primary">Update Barcodes</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Current Barcodes</h5>
+                    <span class="badge bg-secondary" id="lastUpdated">Updating...</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Barcode</th>
+                                    <th>Security</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="barcodeTableBody">
+                                <tr>
+                                    <td colspan="3" class="text-center">Loading barcodes...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -137,6 +164,68 @@ __DATA__
     </div>
 
     <script>
+        function updateBarcodeTable() {
+            $.getJSON('/getitems', function(response) {
+                if (response.status && response.items) {
+                    const tbody = $('#barcodeTableBody');
+                    tbody.empty();
+                    
+                    if (Object.keys(response.items).length === 0) {
+                        tbody.html('<tr><td colspan="3" class="text-center">No barcodes loaded</td></tr>');
+                    } else {
+                        Object.entries(response.items).forEach(([barcode, data]) => {
+                            const securityStatus = data.security ? 'true' : 'false';
+                            const securityClass = data.security ? 'text-success' : 'text-danger';
+                            const securityText = data.security ? 'Active' : 'Inactive';
+                            
+                            tbody.append(`
+                                <tr>
+                                    <td>${barcode}</td>
+                                    <td class="${securityClass}">${securityText}</td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input security-toggle" 
+                                                   type="checkbox" 
+                                                   ${data.security ? 'checked' : ''}
+                                                   data-barcode="${barcode}">
+                                        </div>
+                                    </td>
+                                </tr>
+                            `);
+                        });
+                    }
+                    
+                    // Update last updated time
+                    const now = new Date();
+                    $('#lastUpdated').text('Updated: ' + now.toLocaleTimeString());
+                }
+            }).fail(function() {
+                $('#barcodeTableBody').html('<tr><td colspan="3" class="text-center text-danger">Error loading barcodes</td></tr>');
+            });
+        }
+        
+        // Toggle security status
+        $(document).on('change', '.security-toggle', function() {
+            const barcode = $(this).data('barcode');
+            const securityBit = $(this).is(':checked');
+            
+            $.get(`/setsecurity/${barcode}/${securityBit}`, function() {
+                // Update the row's appearance after successful update
+                const row = $(`[data-barcode="${barcode}"]`).closest('tr');
+                const statusCell = row.find('td:eq(1)');
+                
+                if (securityBit) {
+                    statusCell.removeClass('text-danger').addClass('text-success').text('Active');
+                } else {
+                    statusCell.removeClass('text-success').addClass('text-danger').text('Inactive');
+                }
+            }).fail(function() {
+                // Revert the toggle if update fails
+                $(this).prop('checked', !securityBit);
+                alert('Failed to update security status');
+            });
+        });
+        
         $(document).ready(function() {
             // Update barcodes
             $('#updateBarcodes').click(function() {
@@ -149,14 +238,19 @@ __DATA__
                     data: JSON.stringify({ barcodes: barcodes }),
                     success: function(response) {
                         console.log(`Updated ${response.count} barcodes`);
+                        // Refresh the barcode table after update
+                        updateBarcodeTable();
                     },
                     error: function(xhr) {
                         alert('Error updating barcodes');
-
                         console.error(xhr);
                     }
                 });
             });
+            
+            // Initial load and set up auto-refresh
+            updateBarcodeTable();
+            setInterval(updateBarcodeTable, 1000);
         });
     </script>
 </body>
