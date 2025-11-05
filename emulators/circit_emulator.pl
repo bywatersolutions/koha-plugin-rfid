@@ -60,7 +60,7 @@ get '/getitems' => sub ($c) {
     my @items = map { 
         { 
             barcode => $_,
-            security => $config->{barcodes}{$_}{security} ? \1 : \0
+            security => ${$config->{barcodes}->{$_}->{security}} ? \1 : \0
         }
     } keys %{ $config->{barcodes} };
     
@@ -76,8 +76,8 @@ get '/setsecurity/:barcode/:security_bit' => sub ($c) {
     my $barcode = $c->param('barcode');
     my $security_bit = $c->param('security_bit');
 
-    if ( $config->{barcodes}{$barcode} ) {
-        $config->{barcodes}{$barcode}{security} = $security_bit eq 'true' ? \1 : \0;
+    if ( $config->{barcodes}->{$barcode} ) {
+        $config->{barcodes}->{$barcode}->{security} = $security_bit eq 'true' ? \1 : \0;
 
         return $c->render(
             json => {
@@ -190,7 +190,8 @@ __DATA__
                     if (Object.keys(response.items).length === 0) {
                         tbody.html('<tr><td colspan="3" class="text-center">No barcodes loaded</td></tr>');
                     } else {
-                        Object.entries(response.items).forEach(([barcode, data]) => {
+                        Object.entries(response.items).forEach(([idx, data]) => {
+                            const barcode = data.barcode;
                             const securityStatus = data.security ? 'true' : 'false';
                             const securityClass = data.security ? 'text-success' : 'text-danger';
                             const securityText = data.security ? 'Active' : 'Inactive';
@@ -226,7 +227,7 @@ __DATA__
             const barcode = $(this).data('barcode');
             const securityBit = $(this).is(':checked');
             
-            $.get(`/setsecurity/${barcode}/${securityBit}`, function() {
+            $.get(`/setsecurity/${barcode}/${securityBit}`, function(r) {
                 // Update the row's appearance after successful update
                 const row = $(`[data-barcode="${barcode}"]`).closest('tr');
                 const statusCell = row.find('td:eq(1)');
