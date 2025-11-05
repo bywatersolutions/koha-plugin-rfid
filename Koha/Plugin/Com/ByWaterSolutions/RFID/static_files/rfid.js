@@ -1,3 +1,5 @@
+console.log("RFID Plugin loaded");
+
 const circit_port = TechLogicCircItNonAdministrativeMode
   ? "80/Temporary_Listen_Addresses"
   : TechLogicCircItPort
@@ -30,7 +32,8 @@ async function detect_rfid_type_techlogic_ciric() {
         return isAlive;
     } catch (error) {
         console.error('TechLogic CircIt detection failed:', error);
-        r
+        return false;
+    }
 }
 
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
