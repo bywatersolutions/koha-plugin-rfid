@@ -1,4 +1,5 @@
 console.log("RFID Plugin loaded");
+const debugTimeout = 5000;
 
 // Override storage functions to update the UI
 const originalSetUnprocessedBarcodes = set_unprocessed_barcodes;
@@ -28,7 +29,7 @@ const circit_address = `http://localhost:${circit_port}`;
  * Detects if the RFID reader is a TechLogic CircIt device by checking the /alive endpoint
  * @returns {Promise<boolean>} Resolves to true if the endpoint responds with status 200 and valid JSON
  */
-async function detect_rfid_type_techlogic_ciric() {
+async function detect_rfid_type_techlogic_circit() {
     try {
         const response = await fetch(`${circit_address}/alive`, {
             method: 'GET',
@@ -100,12 +101,12 @@ function handle_tab_inactive() {
   }
 }
 
+function initUserInterface() {
+  initFloatingResetButton();
+  initFloatingBarcodeBox();
+}
+
 function handle_tab_active() {
-  if (localStorage.getItem('koha_plugin_rfid_show_barcode_box') !== 'false') {
-      initFloatingBarcodeBox();
-  }
-
-
   initiate_rfid_scanning();
 }
 
@@ -126,19 +127,6 @@ function handle_one_at_a_time(
   submit_form_automatically
 ) {
   console.log("handle_one_at_a_time");
-
-  // Add a button to the buttom right to "reset" the list of seen barcodes
-  var $button = $("<button>", {
-    style:
-      "position: fixed; bottom: 20px; right: 20px; background-color: red; color: white; font-weight: bold",
-    id: "rfid-reset-button",
-    text: "Reset RFID",
-    click: function () {
-      handle_action_change("");
-      initiate_rfid_scanning();
-    },
-  });
-  $("body").append($button);
 
   let halt = false;
 
@@ -286,12 +274,14 @@ function set_security_and_submit_single_barcode(
 
     const r = alter_security_bits([barcode], security_flag_value).then(
       function () {
+        sleep();
         form_submit.click();
       }
     );
   } else {
     // No change in RFID security bits
     if (submit_form_automatically) {
+      sleep();
       form_submit.click();
     }
   }
@@ -320,6 +310,10 @@ function detect_and_handle_rfid_for_page(data) {
   }
 
   set_previous_action(current_action);
+  
+  if ( current_action ) {
+    initUserInterface();
+  }
 
   console.log("CURRENT ACTION:", current_action);
   if (current_action) {
@@ -538,6 +532,7 @@ function handle_one_and_done(
           const r = alter_security_bits(barcodes, security_flag_value).then(
             function () {
               if (submit_form_automatically) {
+                sleep();
                 form_submit.click();
               }
             }
@@ -545,6 +540,7 @@ function handle_one_and_done(
         } else {
           // No change in RFID security bits
           if (submit_form_automatically) {
+            sleep();
             form_submit.click();
           }
         }
@@ -625,6 +621,7 @@ function handle_batch(
         const r = alter_security_bits(barcodes, security_flag_value).then(
           function () {
             if (submit_form_automatically) {
+              sleep();
               form_submit.click();
             } else {
               // Start looking for more barcodes, allows multiple stacks of items to be dropped on rfid pad in turn
@@ -641,6 +638,7 @@ function handle_batch(
       } else {
         // No change in RFID security bits
         if (submit_form_automatically) {
+          sleep();
           form_submit.click();
         } else {
           // Start looking for more barcodes, allows multiple stacks of items to be dropped on rfid pad in turn
@@ -707,6 +705,130 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
 }
 
 // Create and initialize the floating box UI
+function initFloatingResetButton() {
+    // Create the floating reset button
+    const $reset_box = $(`
+        <div id="rfid-reset-box" style="
+            position: fixed;
+            bottom: 20px;  
+            right: 20px;  
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 9998;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        ">
+            <div style="
+                background: #f8f9fa;
+                padding: 8px 15px;
+                border-bottom: 1px solid #ddd;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+            ">
+                <strong>RFID Controls</strong>
+                <div>
+                    <button class="rfid-reset-toggle" style="
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        font-size: 16px;
+                        padding: 0 5px;
+                    ">−</button>
+                    <button class="rfid-reset-close" style="
+                        background: none;
+                        border: none;
+                        color: #dc3545;
+                        cursor: pointer;
+                        font-size: 16px;
+                        padding: 0 5px;
+                    ">×</button>
+                </div>
+            </div>
+            <div id="rfid-reset-content" style="padding: 15px; transition: all 0.3s ease;">
+                <button id="rfid-reset-button" class="btn btn-danger w-100">
+                    <i class="fa fa-refresh" aria-hidden="true"></i> Reset RFID
+                </button>
+            </div>
+        </div>
+    `).appendTo('body');
+
+    // Make draggable
+    let isDragging = false;
+    let offsetX, offsetY;
+    
+    $reset_box.find('> div').first().on('mousedown', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        
+        isDragging = true;
+        offsetX = e.clientX - $reset_box[0].getBoundingClientRect().left;
+        offsetY = e.clientY - $reset_box[0].getBoundingClientRect().top;
+        $reset_box.css('cursor', 'grabbing');
+        e.preventDefault();
+    });
+
+    $(document).on('mousemove', function(e) {
+        if (!isDragging) return;
+        
+        $reset_box.css({
+            left: e.clientX - offsetX + 'px',
+            top: e.clientY - offsetY + 'px',
+            bottom: 'auto',
+            right: 'auto'
+        });
+    });
+
+    $(document).on('mouseup', function() {
+        isDragging = false;
+        $reset_box.css('cursor', 'grab');
+    });
+
+    // Toggle visibility
+    $reset_box.on('click', '.rfid-reset-toggle', function(e) {
+        e.stopPropagation();
+        const $content = $('#rfid-reset-content');
+        const $toggle = $(this);
+        
+        if ($content.is(':visible')) {
+            $content.slideUp(200);
+            $toggle.text('+');
+            // Store preference
+            localStorage.setItem('koha_plugin_rfid_show_reset_box', 'false');
+        } else {
+            $content.slideDown(200);
+            $toggle.text('−');
+            // Store preference
+            localStorage.setItem('koha_plugin_rfid_show_reset_box', 'true');
+        }
+    });
+
+    // Close button
+    $reset_box.on('click', '.rfid-reset-close', function(e) {
+        e.stopPropagation();
+        $reset_box.remove();
+        localStorage.setItem('koha_plugin_rfid_show_reset_box', 'false');
+    });
+
+    // Add click handler for the reset button
+    $reset_box.on('click', '#rfid-reset-button', function(e) {
+        e.stopPropagation();
+        handle_action_change("");
+        initiate_rfid_scanning();
+    });
+
+    // Check if the box was previously closed
+    if (localStorage.getItem('koha_plugin_rfid_show_reset_box') === 'false') {
+        $reset_box.find('#rfid-reset-content').hide();
+        $reset_box.find('.rfid-reset-toggle').text('+');
+    }
+
+    return $reset_box;
+}
+
 function initFloatingBarcodeBox() {
     // Create the floating container
     const $barcode_box = $(`
@@ -939,4 +1061,12 @@ function updateProcessedBarcodeList() {
     `;
     
     $list.html(html);
+}
+
+function sleep(ms) {
+    ms = ms || debugTimeout;
+    const start = Date.now();
+    while (Date.now() - start < ms) {
+        // Do nothing
+    }
 }
