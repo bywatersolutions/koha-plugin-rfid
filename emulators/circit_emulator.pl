@@ -36,7 +36,7 @@ helper set_barcodes => sub ($c, $barcodes) {
 
     # Add new barcodes
     foreach my $b (@b) {
-        $config->{barcodes}{$b} //= { security => \1 };
+        $config->{barcodes}{$b} //= { security => \1, barcode => $b };
     }
 
     say "Barcodes set to " . Data::Dumper::Dumper($config->{barcodes});
@@ -56,13 +56,20 @@ get '/alive' => sub ($c) {
 };
 
 get '/getitems' => sub ($c) {
-        return $c->render(
-            json => {
-                statuscode => 0,
-                status => \1,
-                items => $config->{barcodes},
-            }
-        );
+    # Convert the barcodes hash into the expected array format
+    my @items = map { 
+        { 
+            barcode => $_,
+            security => $config->{barcodes}{$_}{security} ? \1 : \0
+        }
+    } keys %{ $config->{barcodes} };
+    
+    return $c->render(
+        json => {
+            status => Mojo::JSON->true,
+            items => \@items
+        }
+    );
 };
 
 get '/setsecurity/:barcode/:security_bit' => sub ($c) {
