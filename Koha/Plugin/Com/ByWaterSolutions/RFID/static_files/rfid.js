@@ -1,5 +1,14 @@
 console.log("RFID Plugin loaded");
 
+// Override the set_unprocessed_barcodes function to update the UI
+const originalSetUnprocessedBarcodes = set_unprocessed_barcodes;
+set_unprocessed_barcodes = function(barcodes) {
+    originalSetUnprocessedBarcodes(barcodes);
+    if ($('#rfid-barcode-list').length) {
+        updateBarcodeList();
+    }
+};
+
 const circit_port = TechLogicCircItNonAdministrativeMode
   ? "80/Temporary_Listen_Addresses"
   : TechLogicCircItPort
@@ -84,6 +93,11 @@ function handle_tab_inactive() {
 }
 
 function handle_tab_active() {
+  if (localStorage.getItem('koha_plugin_rfid_show_barcode_box') !== 'false') {
+      initFloatingBarcodeBox();
+  }
+
+
   initiate_rfid_scanning();
 }
 
@@ -682,4 +696,151 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
   }, 1500);
   console.log("INTERVAL ID:", intervalID);
   return intervalID;
+}
+
+// Create and initialize the floating box UI
+function initFloatingBarcodeBox() {
+    // Create the floating container
+    const $barcode_box = $(`
+        <div id="rfid-barcode-box" style="
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 300px;
+            max-height: 400px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        ">
+            <div style="
+                background: #f8f9fa;
+                padding: 8px 15px;
+                border-bottom: 1px solid #ddd;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+            ">
+                <strong>Unprocessed Barcodes</strong>
+                <div>
+                    <button id="rfid-box-toggle" style="
+                        background: none;
+                        border: none;
+                        cursor: pointer;
+                        font-size: 16px;
+                        padding: 0 5px;
+                    ">−</button>
+                    <button id="rfid-box-close" style="
+                        background: none;
+                        border: none;
+                        color: #dc3545;
+                        cursor: pointer;
+                        font-size: 16px;
+                        padding: 0 5px;
+                    ">×</button>
+                </div>
+            </div>
+            <div id="rfid-barcode-list" style="
+                padding: 10px;
+                overflow-y: auto;
+                flex-grow: 1;
+            ">
+                <div class="text-muted text-center py-2">No unprocessed barcodes</div>
+            </div>
+        </div>
+    `);
+
+    // Add to body
+    $('body').append($barcode_box);
+
+    // Make draggable
+    let isDragging = false;
+    let offsetX, offsetY;
+    
+    $barcode_box.find('div').first().on('mousedown', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        
+        isDragging = true;
+        offsetX = e.clientX - $barcode_box[0].getBoundingClientRect().left;
+        offsetY = e.clientY - $barcode_box[0].getBoundingClientRect().top;
+        $barcode_box.css('cursor', 'grabbing');
+        e.preventDefault();
+    });
+
+    $(document).on('mousemove', function(e) {
+        if (!isDragging) return;
+        
+        $barcode_box.css({
+            left: e.clientX - offsetX + 'px',
+            top: e.clientY - offsetY + 'px',
+            bottom: 'auto',
+            right: 'auto'
+        });
+    });
+
+    $(document).on('mouseup', function() {
+        isDragging = false;
+        $barcode_box.css('cursor', 'grab');
+    });
+
+    // Toggle visibility
+    $('#rfid-box-toggle').on('click', function() {
+        const $list = $('#rfid-barcode-list');
+        if ($list.is(':visible')) {
+            $list.hide();
+            $(this).text('+');
+            $barcode_box.remove();
+            // Store preference to not show again
+            localStorage.setItem('koha_plugin_rfid_show_barcode_box', 'false');
+        } else {
+            $list.show();
+            $(this).text('−');
+        }
+    });
+
+    // Close button
+    $('#rfid-box-close').on('click', function() {
+      //FIXME: Add a way to remove the floating box and bring it back later
+    });
+
+    // Initial update
+    updateBarcodeList();
+}
+
+// Update the barcode list in the floating box
+function updateBarcodeList() {
+    const barcodes = get_unprocessed_barcodes();
+    const $list = $('#rfid-barcode-list');
+    
+    if (!barcodes || barcodes.length === 0) {
+        $list.html('<div class="text-muted text-center py-2">No unprocessed barcodes</div>');
+        return;
+    }
+    
+    const html = `
+        <div class="list-group" style="max-height: 350px; overflow-y: auto;">
+            ${barcodes.map(barcode => `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="font-monospace">${barcode}</span>
+                    <button class="btn btn-sm btn-outline-danger remove-barcode" data-barcode="${barcode}">×</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    $list.html(html);
+    
+    // Add click handler for remove buttons
+    $('.remove-barcode').on('click', function() {
+        const barcodeToRemove = $(this).data('barcode');
+        const currentBarcodes = get_unprocessed_barcodes();
+        const updatedBarcodes = currentBarcodes.filter(b => b !== barcodeToRemove);
+        set_unprocessed_barcodes(updatedBarcodes);
+        updateBarcodeList();
+    });
 }
