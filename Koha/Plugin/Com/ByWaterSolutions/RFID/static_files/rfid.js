@@ -4,19 +4,19 @@ let rfid_type = undefined;
 
 // Override storage functions to update the UI
 const originalSetUnprocessedBarcodes = set_unprocessed_barcodes;
-set_unprocessed_barcodes = function(barcodes) {
-    originalSetUnprocessedBarcodes(barcodes);
-    if ($('#rfid-barcode-list').length) {
-        updateBarcodeList();
-    }
+set_unprocessed_barcodes = function (barcodes) {
+  originalSetUnprocessedBarcodes(barcodes);
+  if ($('#rfid-barcode-list').length) {
+    updateBarcodeList();
+  }
 };
 
 const originalSetProcessedBarcodes = set_processed_barcodes;
-set_processed_barcodes = function(barcodes) {
-    originalSetProcessedBarcodes(barcodes);
-    if ($('#rfid-processed-barcode-list').length) {
-        updateProcessedBarcodeList();
-    }
+set_processed_barcodes = function (barcodes) {
+  originalSetProcessedBarcodes(barcodes);
+  if ($('#rfid-processed-barcode-list').length) {
+    updateProcessedBarcodeList();
+  }
 };
 
 // RFID Vendor API abstraction
@@ -24,28 +24,61 @@ const rfidVendor = {
   vendors: {
     mksolutions: {
       name: 'mksolutions',
-      baseUrl: null,
-      init: function() {
+      baseUrl: "http://localhost:4039/mkStaffStationAPI",
+      init: function () {
       },
-      checkAlive: async function() {
+      checkAlive: async function () {
         try {
-          console.log(`Checking MK Solutions ${this.name} RFID reader status at ${this.baseUrl}/alive`);
-          const response = await $.getJSON(`${this.baseUrl}/alive`);
-          console.log(`${this.name} RFID reader response:`, response);
-          return response.status === true && response.statuscode === 0;
+          $.ajax({
+            url: `${this.baseUrl}/getItems`,
+            dataType: "xml",
+            success: function (xml) {
+              if (!xml || !$(xml).children().length) {
+                return false;
+              } else {
+                return true;
+              }
+            }
+          });
         } catch (error) {
           console.log(`${this.name} RFID reader check failed:`, error);
           return false;
         }
       },
-      getItems: function() {
-        return $.getJSON(`${this.baseUrl}/getitems`);
-      },
-      setSecurityBits: function(barcode, bitValue) {
+      getItems: function () {
         return $.ajax({
-          url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
-          dataType: "json",
-          async: false
+          url: `${this.baseUrl}/getItems`,
+          dataType: "xml",
+        }).then(function (xml) {
+          console.log("MK Solutions getItems response:", xml);
+          const result = {
+            items: []
+          };
+
+          // Process each item in the XML
+          $(xml).find('item').each(function () {
+            const barcode = $(this).find('barcode').text();
+            const isSecure = $(this).find('is_secure').text().toLowerCase() === 'true';
+
+            result.items.push({
+              barcode: barcode,
+              security: isSecure
+            });
+          });
+
+          console.log("Processed items:", result);
+          return result;
+        }).fail(function (xhr, status, error) {
+          console.error("Error fetching items from MK Solutions:", status, error);
+          return { items: [] };  // Return empty items on error
+        });
+      },
+      setSecurityBit: function (barcode, bitValue) {
+        return $.ajax({
+          url: `${this.baseUrl}/setSecurity`,
+          dataType: "XML",
+          async: false,
+          data: `<rfid><barcode>${barcode}</barcode><is_secure>${bitValue}</is_secure></rfid>`
         });
       }
     },
@@ -57,10 +90,10 @@ const rfidVendor = {
           ? TechLogicCircItPort
           : "9201",
       baseUrl: "",
-      init: function() {
+      init: function () {
         this.baseUrl = `http://localhost:${this.port}`;
       },
-      checkAlive: async function() {
+      checkAlive: async function () {
         try {
           console.log(`Checking CIRCIT ${this.name} RFID reader status at ${this.baseUrl}/alive`);
           const response = await $.getJSON(`${this.baseUrl}/alive`);
@@ -70,10 +103,10 @@ const rfidVendor = {
           return false;
         }
       },
-      getItems: function() {
+      getItems: function () {
         return $.getJSON(`${this.baseUrl}/getitems`);
       },
-      setSecurityBits: function(barcode, bitValue) {
+      setSecurityBit: function (barcode, bitValue) {
         return $.ajax({
           url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
           dataType: "json",
@@ -82,65 +115,84 @@ const rfidVendor = {
       }
     }
   },
-  
-  // Initialize the RFID vendor
-init: async function() {
-  console.log("INITIALIZING RFID VENDOR");
-  // Try to detect which vendor is available
-  for (const [vendorName, vendor] of Object.entries(this.vendors)) {
-    try {
-      console.log(`Checking ${vendorName}`);
 
-      vendor.init();
-      
-      const isAlive = await vendor.checkAlive();
-      
-      if (isAlive) {
-        this.currentVendor = vendor;
-        console.log(`Using ${vendorName} RFID reader at ${vendor.baseUrl}`);
-        return true;
+  // Initialize the RFID vendor
+  init: async function () {
+    console.log("INITIALIZING RFID VENDOR");
+    // Try to detect which vendor is available
+    for (const [vendorName, vendor] of Object.entries(this.vendors)) {
+      try {
+        console.log(`Checking ${vendorName}`);
+
+        vendor.init();
+
+        const isAlive = await vendor.checkAlive();
+
+        if (isAlive) {
+          this.currentVendor = vendor;
+          console.log(`Using ${vendorName} RFID reader at ${vendor.baseUrl}`);
+          return true;
+        }
+      } catch (error) {
+        console.error(`Error initializing ${vendorName}:`, error);
       }
-    } catch (error) {
-      console.error(`Error initializing ${vendorName}:`, error);
     }
-  }
-  
-  console.error('No supported RFID reader found');
-  display_rfid_failure();
-  return false;
-},
-  
+
+    console.error('No supported RFID reader found');
+    display_rfid_failure();
+    return false;
+  },
+
   // Proxy methods to the current vendor
-  checkAlive: function() {
+  checkAlive: function () {
     return this.currentVendor ? this.currentVendor.checkAlive() : Promise.resolve(false);
   },
-  
-  getItems: function() {
+
+  /*
+  * The expected return format for a vendor's getItems is:
+  {
+    "items": [
+      {
+        "barcode": "2",
+        "security": false
+      },
+      {
+        "barcode": "5",
+        "security": false
+      },
+      {
+        "barcode": "3",
+        "security": false
+      }
+    ]
+  }
+  */
+  getItems: function () {
     if (!this.currentVendor) {
       return $.Deferred().reject('No RFID reader available').promise();
     }
     return this.currentVendor.getItems();
   },
-  
-  setSecurityBits: function(barcode, bitValue) {
+
+  setSecurityBit: function (barcode, bitValue) {
     if (!this.currentVendor) {
       return $.Deferred().reject('No RFID reader available').promise();
     }
-    return this.currentVendor.setSecurityBits(barcode, bitValue);
+    return this.currentVendor.setSecurityBit(barcode, bitValue);
   }
 };
 
 async function detect_rfid_interface() {
-    const is_circit = await detect_rfid_type_techlogic_circit();
-    if (is_circit) {
-        console.log('TechLogic CircIt detected');
-        return 'techlogic_circit';
-    } else {
-        console.log('TechLogic CircIt not detected');
-    }
+  const is_circit = await detect_rfid_type_techlogic_circit();
+  if (is_circit) {
+    console.log('TechLogic CircIt detected');
+    return 'techlogic_circit';
+  } else {
+    console.log('TechLogic CircIt not detected');
+  }
 
-    display_rfid_failure();
-    return undefined;
+  display_rfid_failure();
+  return undefined;
 }
 
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
@@ -382,7 +434,7 @@ function set_security_and_submit_single_barcode(
 }
 
 function initiate_rfid_scanning() {
-  rfidVendor.getItems().done(function(data) {
+  rfidVendor.getItems().done(function (data) {
     if (data.status === true) {
       detect_and_handle_rfid_for_page(data);
     } else {
@@ -404,8 +456,8 @@ function detect_and_handle_rfid_for_page(data) {
   }
 
   set_previous_action(current_action);
-  
-  if ( current_action ) {
+
+  if (current_action) {
     initUserInterface();
   }
 
@@ -613,11 +665,11 @@ function handle_one_and_done(
 
         const submit_form_automatically = auto_submit_test_cb
           ? auto_submit_test_cb(
-              action,
-              security_setting,
-              barcode_input,
-              form_submit
-            )
+            action,
+            security_setting,
+            barcode_input,
+            form_submit
+          )
           : true;
 
         if (security_setting == "enable" || security_setting == "disable") {
@@ -701,11 +753,11 @@ function handle_batch(
 
       const submit_form_automatically = auto_submit_test_cb
         ? auto_submit_test_cb(
-            action,
-            security_setting,
-            barcodes_textarea,
-            form_submit
-          )
+          action,
+          security_setting,
+          barcodes_textarea,
+          form_submit
+        )
         : true;
 
       if (security_setting == "enable" || security_setting == "disable") {
@@ -748,10 +800,10 @@ function handle_batch(
 let alter_security_bits = async (barcodes, bit_value) => {
   console.log("alter_security_bits", barcodes, bit_value);
   barcodes.forEach(each => {
-    rfidVendor.setSecurityBits(each, bit_value).done(function(data) {
+    rfidVendor.setSecurityBit(each, bit_value).done(function (data) {
       console.log("setsecurity RETURNED", data);
       return data;
-    }).fail(function() {
+    }).fail(function () {
       console.log("Failed to set security bits for", each);
       return false;
     });
@@ -763,7 +815,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
   let items_count = 0;
 
   intervalID = setInterval(function () {
-    rfidVendor.getItems().done(function(data) {
+    rfidVendor.getItems().done(function (data) {
       console.log(data);
       if (data.items && data.items.length) {
         // We have at least one item on the pad
@@ -791,8 +843,8 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
 
 // Create and initialize the floating box UI
 function initFloatingResetButton() {
-    // Create the floating reset button
-    const $reset_box = $(`
+  // Create the floating reset button
+  const $reset_box = $(`
         <div id="rfid-reset-box" style="
             position: fixed;
             bottom: 20px;  
@@ -842,81 +894,81 @@ function initFloatingResetButton() {
         </div>
     `).appendTo('body');
 
-    // Make draggable
-    let isDragging = false;
-    let offsetX, offsetY;
-    
-    $reset_box.find('> div').first().on('mousedown', function(e) {
-        if (e.target.tagName === 'BUTTON') return;
-        
-        isDragging = true;
-        offsetX = e.clientX - $reset_box[0].getBoundingClientRect().left;
-        offsetY = e.clientY - $reset_box[0].getBoundingClientRect().top;
-        $reset_box.css('cursor', 'grabbing');
-        e.preventDefault();
-    });
+  // Make draggable
+  let isDragging = false;
+  let offsetX, offsetY;
 
-    $(document).on('mousemove', function(e) {
-        if (!isDragging) return;
-        
-        $reset_box.css({
-            left: e.clientX - offsetX + 'px',
-            top: e.clientY - offsetY + 'px',
-            bottom: 'auto',
-            right: 'auto'
-        });
-    });
+  $reset_box.find('> div').first().on('mousedown', function (e) {
+    if (e.target.tagName === 'BUTTON') return;
 
-    $(document).on('mouseup', function() {
-        isDragging = false;
-        $reset_box.css('cursor', 'grab');
-    });
+    isDragging = true;
+    offsetX = e.clientX - $reset_box[0].getBoundingClientRect().left;
+    offsetY = e.clientY - $reset_box[0].getBoundingClientRect().top;
+    $reset_box.css('cursor', 'grabbing');
+    e.preventDefault();
+  });
 
-    // Toggle visibility
-    $reset_box.on('click', '.rfid-reset-toggle', function(e) {
-        e.stopPropagation();
-        const $content = $('#rfid-reset-content');
-        const $toggle = $(this);
-        
-        if ($content.is(':visible')) {
-            $content.slideUp(200);
-            $toggle.text('+');
-            // Store preference
-            localStorage.setItem('koha_plugin_rfid_show_reset_box', 'false');
-        } else {
-            $content.slideDown(200);
-            $toggle.text('−');
-            // Store preference
-            localStorage.setItem('koha_plugin_rfid_show_reset_box', 'true');
-        }
-    });
+  $(document).on('mousemove', function (e) {
+    if (!isDragging) return;
 
-    // Close button
-    $reset_box.on('click', '.rfid-reset-close', function(e) {
-        e.stopPropagation();
-        $reset_box.remove();
-        localStorage.setItem('koha_plugin_rfid_show_reset_box', 'false');
+    $reset_box.css({
+      left: e.clientX - offsetX + 'px',
+      top: e.clientY - offsetY + 'px',
+      bottom: 'auto',
+      right: 'auto'
     });
+  });
 
-    // Add click handler for the reset button
-    $reset_box.on('click', '#rfid-reset-button', function(e) {
-        e.stopPropagation();
-        handle_action_change("");
-        initiate_rfid_scanning();
-    });
+  $(document).on('mouseup', function () {
+    isDragging = false;
+    $reset_box.css('cursor', 'grab');
+  });
 
-    // Check if the box was previously closed
-    if (localStorage.getItem('koha_plugin_rfid_show_reset_box') === 'false') {
-        $reset_box.find('#rfid-reset-content').hide();
-        $reset_box.find('.rfid-reset-toggle').text('+');
+  // Toggle visibility
+  $reset_box.on('click', '.rfid-reset-toggle', function (e) {
+    e.stopPropagation();
+    const $content = $('#rfid-reset-content');
+    const $toggle = $(this);
+
+    if ($content.is(':visible')) {
+      $content.slideUp(200);
+      $toggle.text('+');
+      // Store preference
+      localStorage.setItem('koha_plugin_rfid_show_reset_box', 'false');
+    } else {
+      $content.slideDown(200);
+      $toggle.text('−');
+      // Store preference
+      localStorage.setItem('koha_plugin_rfid_show_reset_box', 'true');
     }
+  });
 
-    return $reset_box;
+  // Close button
+  $reset_box.on('click', '.rfid-reset-close', function (e) {
+    e.stopPropagation();
+    $reset_box.remove();
+    localStorage.setItem('koha_plugin_rfid_show_reset_box', 'false');
+  });
+
+  // Add click handler for the reset button
+  $reset_box.on('click', '#rfid-reset-button', function (e) {
+    e.stopPropagation();
+    handle_action_change("");
+    initiate_rfid_scanning();
+  });
+
+  // Check if the box was previously closed
+  if (localStorage.getItem('koha_plugin_rfid_show_reset_box') === 'false') {
+    $reset_box.find('#rfid-reset-content').hide();
+    $reset_box.find('.rfid-reset-toggle').text('+');
+  }
+
+  return $reset_box;
 }
 
 function initFloatingBarcodeBox() {
-    // Create the floating container
-    const $barcode_box = $(`
+  // Create the floating container
+  const $barcode_box = $(`
         <div id="rfid-barcode-box" style="
             position: fixed;
             bottom: 20px;
@@ -1005,81 +1057,81 @@ function initFloatingBarcodeBox() {
         </div>
     `);
 
-    // Add to body
-    $('body').append($barcode_box);
+  // Add to body
+  $('body').append($barcode_box);
 
-    // Make draggable
-    let isDragging = false;
-    let offsetX, offsetY;
-    
-    $barcode_box.find('div').first().on('mousedown', function(e) {
-        if (e.target.tagName === 'BUTTON') return;
-        
-        isDragging = true;
-        offsetX = e.clientX - $barcode_box[0].getBoundingClientRect().left;
-        offsetY = e.clientY - $barcode_box[0].getBoundingClientRect().top;
-        $barcode_box.css('cursor', 'grabbing');
-        e.preventDefault();
+  // Make draggable
+  let isDragging = false;
+  let offsetX, offsetY;
+
+  $barcode_box.find('div').first().on('mousedown', function (e) {
+    if (e.target.tagName === 'BUTTON') return;
+
+    isDragging = true;
+    offsetX = e.clientX - $barcode_box[0].getBoundingClientRect().left;
+    offsetY = e.clientY - $barcode_box[0].getBoundingClientRect().top;
+    $barcode_box.css('cursor', 'grabbing');
+    e.preventDefault();
+  });
+
+  $(document).on('mousemove', function (e) {
+    if (!isDragging) return;
+
+    $barcode_box.css({
+      left: e.clientX - offsetX + 'px',
+      top: e.clientY - offsetY + 'px',
+      bottom: 'auto',
+      right: 'auto'
     });
+  });
 
-    $(document).on('mousemove', function(e) {
-        if (!isDragging) return;
-        
-        $barcode_box.css({
-            left: e.clientX - offsetX + 'px',
-            top: e.clientY - offsetY + 'px',
-            bottom: 'auto',
-            right: 'auto'
-        });
-    });
+  $(document).on('mouseup', function () {
+    isDragging = false;
+    $barcode_box.css('cursor', 'grab');
+  });
 
-    $(document).on('mouseup', function() {
-        isDragging = false;
-        $barcode_box.css('cursor', 'grab');
-    });
+  // Toggle visibility
+  $('#rfid-box-toggle').on('click', function () {
+    const $list = $('#rfid-barcode-list');
+    console.log("TEST TEST TEEST TEST")
+    if ($list.is(':visible')) {
+      console.log("HIDING");
+      $list.hide();
+      $(this).text('+');
+      // Store preference to not show again
+      localStorage.setItem('koha_plugin_rfid_show_barcode_box', 'false');
+    } else {
+      console.log("SHOWING");
+      $list.show();
+      $(this).text('−');
+    }
+  });
 
-    // Toggle visibility
-    $('#rfid-box-toggle').on('click', function() {
-        const $list = $('#rfid-barcode-list');
-      console.log("TEST TEST TEEST TEST")
-        if ($list.is(':visible')) {
-          console.log("HIDING");
-            $list.hide();
-            $(this).text('+');
-            // Store preference to not show again
-            localStorage.setItem('koha_plugin_rfid_show_barcode_box', 'false');
-        } else {
-          console.log("SHOWING");
-            $list.show();
-            $(this).text('−');
-        }
-    });
+  // Close button
+  $('#rfid-box-close').on('click', function () {
+    //FIXME: Add a way to remove the floating box and bring it back later
+    //$barcode_box.remove();
+  });
 
-    // Close button
-    $('#rfid-box-close').on('click', function() {
-      //FIXME: Add a way to remove the floating box and bring it back later
-      //$barcode_box.remove();
-    });
-
-    // Initial updates
-    updateBarcodeList();
-    updateProcessedBarcodeList();
+  // Initial updates
+  updateBarcodeList();
+  updateProcessedBarcodeList();
 }
 
 // Update the unprocessed barcode list in the floating box
 function updateBarcodeList() {
-    const barcodes = get_unprocessed_barcodes();
-    const $list = $('#rfid-barcode-list');
-    
-    // Update count badge
-    $('#unprocessed-count').text(barcodes.length);
-    
-    if (!barcodes || barcodes.length === 0) {
-        $list.html('<div class="text-muted text-center py-2">No unprocessed barcodes</div>');
-        return;
-    }
-    
-    const html = `
+  const barcodes = get_unprocessed_barcodes();
+  const $list = $('#rfid-barcode-list');
+
+  // Update count badge
+  $('#unprocessed-count').text(barcodes.length);
+
+  if (!barcodes || barcodes.length === 0) {
+    $list.html('<div class="text-muted text-center py-2">No unprocessed barcodes</div>');
+    return;
+  }
+
+  const html = `
         <div class="list-group" style="max-height: 350px; overflow-y: auto;">
             ${barcodes.map(barcode => `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
@@ -1092,49 +1144,49 @@ function updateBarcodeList() {
             `).join('')}
         </div>
     `;
-    
-    $list.html(html);
-    
-    // Add click handler for remove buttons
-    $('.remove-barcode').on('click', function(e) {
-        e.stopPropagation();
-        const barcodeToRemove = $(this).data('barcode');
-        const currentBarcodes = get_unprocessed_barcodes();
-        const updatedBarcodes = currentBarcodes.filter(b => b !== barcodeToRemove);
-        set_unprocessed_barcodes(updatedBarcodes);
-        updateBarcodeList();
-    });
-    
-    // Add click handler for process buttons
-    $('.process-barcode').on('click', function(e) {
-        e.stopPropagation();
-        const barcodeToProcess = $(this).data('barcode');
-        const currentUnprocessed = get_unprocessed_barcodes();
-        const updatedUnprocessed = currentUnprocessed.filter(b => b !== barcodeToProcess);
-        set_unprocessed_barcodes(updatedUnprocessed);
-        add_processed_barcode(barcodeToProcess);
-        updateBarcodeList();
-        updateProcessedBarcodeList();
-    });
+
+  $list.html(html);
+
+  // Add click handler for remove buttons
+  $('.remove-barcode').on('click', function (e) {
+    e.stopPropagation();
+    const barcodeToRemove = $(this).data('barcode');
+    const currentBarcodes = get_unprocessed_barcodes();
+    const updatedBarcodes = currentBarcodes.filter(b => b !== barcodeToRemove);
+    set_unprocessed_barcodes(updatedBarcodes);
+    updateBarcodeList();
+  });
+
+  // Add click handler for process buttons
+  $('.process-barcode').on('click', function (e) {
+    e.stopPropagation();
+    const barcodeToProcess = $(this).data('barcode');
+    const currentUnprocessed = get_unprocessed_barcodes();
+    const updatedUnprocessed = currentUnprocessed.filter(b => b !== barcodeToProcess);
+    set_unprocessed_barcodes(updatedUnprocessed);
+    add_processed_barcode(barcodeToProcess);
+    updateBarcodeList();
+    updateProcessedBarcodeList();
+  });
 }
 
 // Update the processed barcode list in the floating box
 function updateProcessedBarcodeList() {
-    const barcodes = get_processed_barcodes();
-    const $list = $('#rfid-processed-barcode-list');
-    
-    // Update count badge
-    $('#processed-count').text(barcodes.length);
-    
-    if (!barcodes || barcodes.length === 0) {
-        $list.html('<div class="text-muted text-center py-2">No processed barcodes</div>');
-        return;
-    }
-    
-    // Show most recently processed items first
-    const reversedBarcodes = [...barcodes].reverse();
-    
-    const html = `
+  const barcodes = get_processed_barcodes();
+  const $list = $('#rfid-processed-barcode-list');
+
+  // Update count badge
+  $('#processed-count').text(barcodes.length);
+
+  if (!barcodes || barcodes.length === 0) {
+    $list.html('<div class="text-muted text-center py-2">No processed barcodes</div>');
+    return;
+  }
+
+  // Show most recently processed items first
+  const reversedBarcodes = [...barcodes].reverse();
+
+  const html = `
         <div class="list-group" style="max-height: 350px; overflow-y: auto;">
             ${reversedBarcodes.map(barcode => `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
@@ -1144,6 +1196,6 @@ function updateProcessedBarcodeList() {
             `).join('')}
         </div>
     `;
-    
-    $list.html(html);
+
+  $list.html(html);
 }
