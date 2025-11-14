@@ -1,0 +1,92 @@
+name: Sync GitHub Release with npm version
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  sync-version:
+    name: Sync Release Version
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Checkout main branch
+      run: |
+        git checkout main
+        git pull origin main
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        # Extract version from tag (remove 'v' prefix if present)
+        VERSION=${GITHUB_REF#refs/tags/}
+        VERSION=${VERSION#v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION"
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Check if version sync is needed
+      id: check
+      run: |
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        TARGET_VERSION="${{ steps.version.outputs.version }}"
+        if [ "$CURRENT_VERSION" = "$TARGET_VERSION" ]; then
+          echo "needs_sync=false" >> $GITHUB_OUTPUT
+          echo "Version already matches: $CURRENT_VERSION"
+        else
+          echo "needs_sync=true" >> $GITHUB_OUTPUT
+          echo "Version sync needed: $CURRENT_VERSION -> $TARGET_VERSION"
+        fi
+
+    - name: Update package.json version
+      if: steps.check.outputs.needs_sync == 'true'
+      run: |
+        # Update package.json version to match the release tag
+        npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+    - name: Update plugin file version
+      if: steps.check.outputs.needs_sync == 'true'
+      run: |
+        # Run the preversion script logic manually to update plugin file
+        sed -i -e "s/^our \$VERSION = .*/our \$VERSION = \"${{ steps.version.outputs.version }}\";/" Koha/Plugin/Com/ByWaterSolutions/RFID.pm
+        rm -f Koha/Plugin/Com/ByWaterSolutions/RFID.pm-e
+
+    - name: Commit version updates
+      if: steps.check.outputs.needs_sync == 'true'
+      run: |
+        git add package.json package-lock.json Koha/Plugin/Com/ByWaterSolutions/RFID.pm
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Sync version ${{ steps.version.outputs.version }} from GitHub release"
+          git push origin main
+        fi
+
+    - name: Build plugin
+      run: npm run build
+
+    - name: Upload kpz to release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ./koha-plugin-rfid-v${{ steps.version.outputs.version }}.kpz
+        tag_name: ${{ github.ref_name }}

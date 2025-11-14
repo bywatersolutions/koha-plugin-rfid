@@ -1,35 +1,30 @@
 {
-  "name": "koha-plugin-kitchen-sink",
-  "version": "2.1.30",
-  "previous_version": "2.1.29",
-  "description": "Koha Kitchen Sink Plugin",
+  "name": "koha-plugin-rfid",
+  "version": "2.6.3",
+  "description": "Koha RFID Plugin",
   "devDependencies": {
-    "gulp": "^3.9.1",
-    "gulp-cli": "^1.2.2",
-    "gulp-github-release": "^1.1.5",
-    "gulp-run": "^1.7.1",
-    "prettier": "3.2.5"
+    "gulp": "^4.0.2",
+    "gulp-cli": "^3.0.0",
+    "vinyl": "^3.0.0"
   },
   "scripts": {
+    "preversion": "sed -i -e \"s/^our \\$VERSION = .*/our \\$VERSION = \\\"$npm_new_version\\\";/\" Koha/Plugin/Com/ByWaterSolutions/RFID.pm; git add -u; rm -f Koha/Plugin/Com/ByWaterSolutions/RFID.pm-e",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "tidy": "prettier . --write"
+    "kpz": "node -e \"console.log(process.env.npm_package_name + '-v' + process.env.npm_package_version + '.kpz')\"",
+    "print-name": "node -e \"console.log(process.env.npm_package_name)\"",
+    "build": "gulp build"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bywatersolutions/koha-plugin-kitchen-sink.git"
+    "url": "git+https://github.com/bywatersolutions/koha-plugin-rfid.git"
   },
   "author": "Kyle M Hall <kyle@bywatersolutions.com>",
   "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/bywatersolutions/koha-plugin-kitchen-sink/issues"
+    "url": "https://github.com/bywatersolutions/koha-plugin-rfid/issues"
   },
-  "homepage": "https://github.com/bywatersolutions/koha-plugin-kitchen-sink#readme",
+  "homepage": "https://github.com/bywatersolutions/koha-plugin-rfid#readme",
   "dependencies": {
-    "datetime": "0.0.3",
-    "jsonfile": "^4.0.0",
     "node-datetime": "^2.0.0"
-  },
-  "overrides": {
-    "graceful-fs": "^4.2.9"
   }
 }
