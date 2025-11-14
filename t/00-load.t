@@ -44,7 +44,7 @@ find(
             use_ok($m) || BAIL_OUT("***** PROBLEMS LOADING FILE '$m'");
         },
     },
-    $lib
+    '.'
 );
 
 done_testing();
