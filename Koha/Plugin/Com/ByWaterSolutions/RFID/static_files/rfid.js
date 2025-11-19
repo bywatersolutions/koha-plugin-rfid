@@ -1,6 +1,7 @@
 console.log("RFID Plugin loaded");
 
 let rfid_type = undefined;
+let loaded_rfid_message_boxes = false;
 
 // Override storage functions to update the UI
 const originalSetUnprocessedBarcodes = set_unprocessed_barcodes;
@@ -286,7 +287,7 @@ function handle_one_at_a_time(
     ? form_submit
     : barcode_input.closest("form").find(":submit");
 
-  const dialog_alert_message = $("div.dialog.alert");
+  const dialog_alert_message = $("div.alert");
 
   //TODO: Make this list configurable from the plugin interface
   if (
@@ -322,7 +323,7 @@ function handle_one_at_a_time(
     $("#circ-needsconfirmation-modal").length &&
     !continue_processing
   ) {
-    console.log("NEEDS CONFIMRATION");
+    console.log("NEEDS CONFIRMATION");
     const button = $("#circ-needsconfirmation-modal button.deny");
     button.on("click", function () {
       continue_processing = true;
@@ -401,7 +402,7 @@ function handle_one_at_a_time(
         } else {
           console.log("NO BARCODE TO PROCESS");
           // Start again, librarian may put new stack of items on the RFID pad
-          handle_one_at_a_time();
+          handle_one_at_a_time(action, security_setting);
         }
       }, true); // The 'true' enables the 'no wait' option for 'one at a time' processing
     }
@@ -457,8 +458,9 @@ function detect_and_handle_rfid_for_page(data) {
 
   set_previous_action(current_action);
 
-  if (current_action) {
+  if (current_action && !loaded_rfid_message_boxes) {
     initUserInterface();
+    loaded_rfid_message_boxes = true;
   }
 
   console.log("CURRENT ACTION:", current_action);
@@ -819,9 +821,9 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
       console.log(data);
       if (data.items && data.items.length) {
         // We have at least one item on the pad
-        if (items_count > 0 && items_count == data.items.length) {
-          // No more items have been added since the last check
-          // so it is time to process the stack of items.
+        if (items_count > 0) {
+          // RFID Service provides debouncing of items on antenna, no need to
+          // do that here as it adds additional delays in reporting item IDs
           clearInterval(intervalID);
           console.log(
             "ITEMS HAVE SETTLED, FINISHED WAITING, INITIATING CALLBACK"
@@ -836,7 +838,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
         cb(data);
       }
     });
-  }, 1500);
+  }, 500);
   console.log("INTERVAL ID:", intervalID);
   return intervalID;
 }
