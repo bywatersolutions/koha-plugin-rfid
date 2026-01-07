@@ -25,41 +25,41 @@ const rfidVendor = {
   vendors: {
     mksolutions: {
       name: 'mksolutions',
-      baseUrl: "http://localhost:4039/mkStaffStationAPI",
+      baseUrl: "http://127.0.0.1:4039/mkStaffStationAPI",
       init: function () {
       },
       checkAlive: async function () {
         try {
-          $.ajax({
+          console.log(`Checking MK Solutions RFID reader status at ${this.baseUrl}/getItems`);
+          const xml = await $.ajax({
             url: `${this.baseUrl}/getItems`,
-            dataType: "xml",
-            success: function (xml) {
-              if (!xml || !$(xml).children().length) {
-                return false;
-              } else {
-                return true;
-              }
-            }
+            dataType: "xml"
           });
+          console.log(`MK Solutions RFID reader check successful: ${xml}`);
+          return xml ? true : false;
         } catch (error) {
           console.log(`${this.name} RFID reader check failed:`, error);
           return false;
         }
       },
-      getItems: function () {
+      getItems: async function () {
         return $.ajax({
           url: `${this.baseUrl}/getItems`,
           dataType: "xml",
         }).then(function (xml) {
           console.log("MK Solutions getItems response:", xml);
           const result = {
+            status: true,
             items: []
           };
 
           // Process each item in the XML
           $(xml).find('item').each(function () {
+            console.log("Processing item:", $(this));
             const barcode = $(this).find('barcode').text();
+            console.log("Barcode:", barcode);
             const isSecure = $(this).find('is_secure').text().toLowerCase() === 'true';
+            console.log("Is secure:", isSecure);
 
             result.items.push({
               barcode: barcode,
@@ -77,8 +77,10 @@ const rfidVendor = {
       setSecurityBit: function (barcode, bitValue) {
         return $.ajax({
           url: `${this.baseUrl}/setSecurity`,
-          dataType: "XML",
+          dataType: "xml",
+          contentType: "text/xml",
           async: false,
+          method: "PUT",
           data: `<rfid><barcode>${barcode}</barcode><is_secure>${bitValue}</is_secure></rfid>`
         });
       }
@@ -96,11 +98,11 @@ const rfidVendor = {
       },
       checkAlive: async function () {
         try {
-          console.log(`Checking CIRCIT ${this.name} RFID reader status at ${this.baseUrl}/alive`);
+          console.log(`Checking CIRCIT RFID reader status at ${this.baseUrl}/alive`);
           const response = await $.getJSON(`${this.baseUrl}/alive`);
           return response.status === true && response.statuscode === 0;
         } catch (error) {
-          console.log(`${this.name} RFID reader check failed:`, error);
+          console.log(`CIRCIT RFID reader check failed:`, error);
           return false;
         }
       },
@@ -128,6 +130,7 @@ const rfidVendor = {
         vendor.init();
 
         const isAlive = await vendor.checkAlive();
+        console.log(`Is ${vendorName} RFID reader alive?`, isAlive);
 
         if (isAlive) {
           this.currentVendor = vendor;
@@ -421,8 +424,10 @@ function set_security_and_submit_single_barcode(
   if (security_setting == "enable" || security_setting == "disable") {
     const security_flag_value = security_setting == "enable" ? true : false;
 
+    console.log("ALTERING SECURITY BITS");
     const r = alter_security_bits([barcode], security_flag_value).then(
       function () {
+        console.log("ALTERING SECURITY BITS COMPLETED");
         form_submit.click();
       }
     );
@@ -435,13 +440,13 @@ function set_security_and_submit_single_barcode(
 }
 
 function initiate_rfid_scanning() {
-  rfidVendor.getItems().done(function (data) {
+  rfidVendor.getItems().then(function (data) {
     if (data.status === true) {
       detect_and_handle_rfid_for_page(data);
     } else {
       console.log("No items found on RFID reader");
     }
-  }).fail(function () {
+  }, function () {
     display_rfid_failure();
   });
 }
@@ -805,8 +810,8 @@ let alter_security_bits = async (barcodes, bit_value) => {
     rfidVendor.setSecurityBit(each, bit_value).done(function (data) {
       console.log("setsecurity RETURNED", data);
       return data;
-    }).fail(function () {
-      console.log("Failed to set security bits for", each);
+    }).fail(function (data) {
+      console.log("Failed to set security bits for", each, data);
       return false;
     });
   });
@@ -817,7 +822,7 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
   let items_count = 0;
 
   intervalID = setInterval(function () {
-    rfidVendor.getItems().done(function (data) {
+    rfidVendor.getItems().then(function (data) {
       console.log(data);
       if (data.items && data.items.length) {
         // We have at least one item on the pad
