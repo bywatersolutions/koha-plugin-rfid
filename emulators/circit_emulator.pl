@@ -117,6 +117,7 @@ __DATA__
 % layout 'default';
 % title 'Tech Logic CircIt RFID Emulator';
 
+<h3>Tech Logic CircIt RFID Emulator</h3>
 <div class="container mt-5">
     <div class="row">
         <div class="col-md-6">
