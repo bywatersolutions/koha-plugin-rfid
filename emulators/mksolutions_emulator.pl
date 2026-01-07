@@ -21,8 +21,13 @@ app->hook(after_dispatch => sub {
 
     $headers->header('Access-Control-Allow-Origin'  => '*');
     $headers->header('Access-Control-Allow-Methods' => 'GET, OPTIONS, POST, DELETE, PUT');
-    $headers->header('Access-Control-Allow-Headers' => 'Content-Type, application/x-www-form-urlencoded');
+    $headers->header('Access-Control-Allow-Headers' => 'Content-Type, X-Requested-With');
 });
+
+# Handle OPTIONS requests for CORS
+options '*' => sub ($c) {
+    $c->render(text => '', status => 200);
+};
 
 # Helper to set barcodes
 helper set_barcodes => sub ($c, $barcodes) {
@@ -46,7 +51,7 @@ helper set_barcodes => sub ($c, $barcodes) {
 
 get '/' => 'index';
 
-get '/getItems' => sub ($c) {
+get '/mkStaffStationAPI/getItems' => sub ($c) {
     # Convert the barcodes hash into the expected array format
     my @items = map { 
         { 
@@ -98,19 +103,23 @@ get '/getItems' => sub ($c) {
     );
 };
 
-put '/setSecurity' => sub ($c) {
+put '/mkStaffStationAPI/setSecurity' => sub ($c) {
     my $barcode;
     my $security_bit;
 
     my $body = $c->req->body;
     if ( $body ) {
+        warn "FOUND BODY: $body";
         if ( $body =~ m{<barcode>(.*?)</barcode>}s ) {
             $barcode = $1;
+            warn "FOUND BARCODE: $barcode";
         }
         if ( $body =~ m{<is_secure>(.*?)</is_secure>}s ) {
             $security_bit = $1;
+            warn "FOUND SECURITY BIT: $security_bit";
         }
     } else {
+        warn "NO BODY FOUND";
         return $c->render(
             json => {
                 status => 'error',
@@ -120,7 +129,7 @@ put '/setSecurity' => sub ($c) {
         );
     }
 
-my $xml;
+    my $xml;
     if ( $barcode && $config->{barcodes}->{$barcode} ) {
         $config->{barcodes}->{$barcode}->{security} = $security_bit eq 'true' ? \1 : \0;
 
