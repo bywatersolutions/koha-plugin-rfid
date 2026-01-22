@@ -65,7 +65,7 @@ jobs:
       run: |
         cd ../koha-testing-docker
         export KTD_HOME=$(pwd)
-        ktd --name rfid --wait-ready 120
+        ktd --name rfid --wait-ready 500
 
     - name: Run plugin tests
       run: |
