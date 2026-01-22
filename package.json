@@ -1,6 +1,6 @@
 {
   "name": "koha-plugin-rfid",
-  "version": "0.1.3-beta",
+  "version": "0.2.0-beta",
   "description": "Koha RFID Plugin",
   "devDependencies": {
     "gulp": "^4.0.2",
