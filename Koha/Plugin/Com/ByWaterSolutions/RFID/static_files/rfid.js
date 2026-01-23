@@ -70,7 +70,11 @@ const rfidVendor = {
           console.log("Processed items:", result);
           return result;
         }).fail(function (xhr, status, error) {
-          console.error("Error fetching items from MK Solutions:", status, error);
+          if (error == "Not Found") {
+            console.log("No items found in MK Solutions RFID reader");
+          } else {
+            console.error("Error fetching items from MK Solutions:", status, error);
+          }
           return { items: [] };  // Return empty items on error
         });
       },
