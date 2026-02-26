@@ -7,3 +7,5 @@ A plugin to add support for RFID readers to Koha
 This plugin allows Koha to read RFID tags from the following RFID software:
 
 - Tech Logic CircIT
+- MK Solutions StaffStation
+- Bibliotheca staffConnect Link

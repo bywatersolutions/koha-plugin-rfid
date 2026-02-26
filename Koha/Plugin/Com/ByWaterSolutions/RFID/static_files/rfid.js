@@ -89,6 +89,81 @@ const rfidVendor = {
         });
       }
     },
+    bibliotheca: {
+      name: 'bibliotheca',
+      baseUrl: "http://localhost:21645/TagService/Web/",
+      init: async function () {
+        try {
+          console.log("Bibliotheca RFID reader init start...");
+          await doAsyncPostAsPromise("ConnectReader", null);
+          console.log("Bibliotheca RFID reader init done");
+        } catch (err) {
+          console.log("Bibliotheca RFID reader init FAIL: " + err);
+        }
+      },
+      checkAlive: async function () {
+        // IsOnline is also an option
+        let is_alive = false;
+        try {
+          debugAdd("IsConnected" + " start...");
+          var rslt = await doAsyncGetAsPromise("IsConnected");
+          debugAdd("IsConnected" + " done, result = " + rslt);
+          is_alive = true;
+        } catch (err) {
+          debugAdd("IsConnected" + " FAIL: " + err);
+        }
+        return is_alive;
+      },
+      getItems: async function () {
+        return $.ajax({
+          url: `${this.baseUrl}/GetItems`,
+          dataType: "json",
+        }).then(function (json) {
+          console.log("Bibliotheca getItems response:", json);
+
+          const result = {
+            status: true,
+            items: []
+          };
+
+          foreach (item in json) {
+            console.log("Processing item:", item);
+            const barcode = item.Id;
+            console.log("Barcode:", barcode);
+            const isSecure = item.IsSecured ? true : false;
+            console.log("Is secure:", isSecure);
+
+            result.items.push({
+              barcode: barcode,
+              security: isSecure
+            });
+          }
+
+          console.log("Bibliotheca Processed items:", result);
+          return result;
+        }).fail(function (xhr, status, error) {
+          if (error == "Not Found") {
+            console.log("No items found in Bibliotheca RFID reader");
+          } else {
+            console.error("Error fetching items from Bibliotheca:", status, error);
+          }
+          return { items: [] };  // Return empty items on error
+        });
+      },
+      setSecurityBit: function (barcode, bitValue) {
+        return $.ajax({
+          url: `${this.baseUrl}/SetTagSecurity`,
+          dataType: "json",
+          contentType: "application/json",
+          async: false,
+          method: "PUT",
+          data: JSON.stringify({
+            tagId: barcode,
+            IsSecured: bitValue ? true : false
+          })
+        });
+      }
+    },
     circit: {
       name: 'circit',
       port: TechLogicCircItNonAdministrativeMode
@@ -1209,4 +1284,41 @@ function updateProcessedBarcodeList() {
     `;
 
   $list.html(html);
+}
+
+function doAsyncPostAsPromise(method, args) {
+  return new Promise((resolve, reject) => {
+    var req = new XMLHttpRequest;
+    req.open("POST", TAG_SERVICE_ROOT_URL + method, true);
+    req.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+    req.onreadystatechange = function () {
+      if (this.readyState == XMLHttpRequest.DONE) {
+        if (this.status == 200) {
+          resolve();
+        } else {
+          reject(errorDetail(this));
+        }
+      }
+    };
+    req.send(args);
+  });
+}
+
+function doAsyncGetAsPromise(method) {
+  return new Promise((resolve, reject) => {
+    var req = new XMLHttpRequest;
+    req.open("GET", TAG_SERVICE_ROOT_URL + method, true);
+    req.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+    req.onreadystatechange = function () {
+      if (this.readyState == XMLHttpRequest.DONE) {
+        if (this.status == 200) {
+          var rslt = JSON.parse(this.responseText);
+          resolve(rslt[method + "Result"]);
+        } else {
+          reject(errorDetail(this));
+        }
+      }
+    };
+    req.send(null);
+  });
 }
