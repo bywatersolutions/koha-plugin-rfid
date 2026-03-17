@@ -18,29 +18,80 @@
         <input type="hidden" name="class" value="[% CLASS %]"/>
         <input type="hidden" name="method" value="[% METHOD %]"/>
 
-        <fieldset>
-          <legend>Tech Logic</legend>
+        <ul class="nav nav-tabs" id="rfidConfigTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="branches-tab" data-bs-toggle="tab" data-bs-target="#branches" type="button" role="tab" aria-controls="branches" aria-selected="true">Branch Settings</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="techlogic-tab" data-bs-toggle="tab" data-bs-target="#techlogic" type="button" role="tab" aria-controls="techlogic" aria-selected="false">Tech Logic</button>
+            </li>
+        </ul>
 
-          <div class="form-group">
-            <label for="TechLogicCircItPort">Port</label>
-            <input type="number" class="form-control" name="TechLogicCircItPort" value="[% TechLogicCircItPort | html %]"placeholder="9201">
-            <span class="hint">The port that CircIT is listening on. Defaults to 9201 if blank.</span>
-          </div>
+        <div class="tab-content" id="rfidConfigTabContent" style="margin-top: 15px;">
+            <div class="tab-pane fade" id="techlogic" role="tabpanel" aria-labelledby="techlogic-tab">
+                <fieldset>
+                  <legend>Tech Logic</legend>
 
-          <div class="form-group">
-            <label>
-                <input type="checkbox" name="TechLogicCircItNonAdministrativeMode" [% IF TechLogicCircItNonAdministrativeMode %]checked[% END %]>
-                Enable Non-Administrative Mode
-            </label>
-            <span class="hint">Enable this setting if CircIT is set to listen in non-administrative mode.</span>
-            <span class="hint">In this mode, the manual port definiation will be ignored and the port will be set to 80 and the path prefixed with <em>Temporary_Listen_Addresses</em></span>
-          </div>
-        </fieldset>
+                  <div class="form-group">
+                    <label for="TechLogicCircItPort">Port</label>
+                    <input type="number" class="form-control" name="TechLogicCircItPort" value="[% TechLogicCircItPort | html %]"placeholder="9201">
+                    <span class="hint">The port that CircIT is listening on. Defaults to 9201 if blank.</span>
+                  </div>
+
+                  <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="TechLogicCircItNonAdministrativeMode" [% IF TechLogicCircItNonAdministrativeMode %]checked[% END %]>
+                        Enable Non-Administrative Mode
+                    </label>
+                    <span class="hint">Enable this setting if CircIT is set to listen in non-administrative mode.</span>
+                    <span class="hint">In this mode, the manual port definiation will be ignored and the port will be set to 80 and the path prefixed with <em>Temporary_Listen_Addresses</em></span>
+                  </div>
+                </fieldset>
+            </div>
+
+            <div class="tab-pane fade show active" id="branches" role="tabpanel" aria-labelledby="branches-tab">
+                <fieldset>
+                    <legend>Enable/Disable RFID by Branch</legend>
+                    <p>Toggle RFID functionality on or off for each branch. Enabled by default.</p>
+
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Branch</th>
+                                <th>RFID Enabled</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH branch IN branches %]
+                            <tr>
+                                <td>[% branch.branchname | html %]</td>
+                                <td>
+                                    <div class="form-check form-switch" style="min-height: auto; padding-left: 2.5em;">
+                                        <input class="form-check-input" type="checkbox" name="rfid_enabled_branchcodes" value="[% branch.branchcode | html %]" id="rfid-branch-[% branch.branchcode | html %]" style="width: 2.5em; height: 1.25em;" [% UNLESS branch.rfid_disabled %]checked[% END %]>
+                                        <label class="form-check-label" for="rfid-branch-[% branch.branchcode | html %]">
+                                            [% IF branch.rfid_disabled %]Disabled[% ELSE %]Enabled[% END %]
+                                        </label>
+                                    </div>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </fieldset>
+            </div>
+        </div>
 
         <input type="hidden" name="save" value="1" />
 
         <input type="submit" value="Save configuration" />
     </form>
 
+    <script>
+        $(document).ready(function() {
+            $('input[name="rfid_enabled_branchcodes"]').on('change', function() {
+                $(this).siblings('label').text($(this).is(':checked') ? 'Enabled' : 'Disabled');
+            });
+        });
+    </script>
 
 [% INCLUDE 'intranet-bottom.inc' %]
