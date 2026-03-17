@@ -3,6 +3,19 @@ console.log("RFID Plugin loaded");
 let rfid_type = undefined;
 let loaded_rfid_message_boxes = false;
 
+const RFID_ENABLED_KEY = 'koha_plugin_rfid_enabled';
+
+function isRfidEnabled() {
+  const stored = localStorage.getItem(RFID_ENABLED_KEY);
+  return stored === null ? true : stored === 'true';
+}
+
+function setRfidEnabled(value) {
+  localStorage.setItem(RFID_ENABLED_KEY, value ? 'true' : 'false');
+}
+
+let rfid_functionality_started = false;
+
 // Override storage functions to update the UI
 const originalSetUnprocessedBarcodes = set_unprocessed_barcodes;
 set_unprocessed_barcodes = function (barcodes) {
@@ -95,7 +108,7 @@ const rfidVendor = {
       init: async function () {
         try {
           console.log("Bibliotheca RFID reader init start...");
-          await doAsyncPostAsPromise("ConnectReader", null);
+          await doAsyncPostAsPromise(this.baseUrl, "ConnectReader", null);
           console.log("Bibliotheca RFID reader init done");
         } catch (err) {
           console.log("Bibliotheca RFID reader init FAIL: " + err);
@@ -104,14 +117,15 @@ const rfidVendor = {
       checkAlive: async function () {
         // IsOnline is also an option
         let is_alive = false;
+
         try {
-          debugAdd("IsConnected" + " start...");
-          var rslt = await doAsyncGetAsPromise("IsConnected");
-          debugAdd("IsConnected" + " done, result = " + rslt);
-          is_alive = true;
+          var rslt = await doAsyncGetAsPromise(this.baseUrl, "IsConnected");
+          console.log("IsConnected result", rslt);
+          is_alive = rslt.IsConnected;
         } catch (err) {
-          debugAdd("IsConnected" + " FAIL: " + err);
+          console.log("IsConnected FAIL: " + err);
         }
+
         return is_alive;
       },
       getItems: async function () {
@@ -126,7 +140,7 @@ const rfidVendor = {
             items: []
           };
 
-          foreach (item in json) {
+          for (const item of json.GetItemsResult) {
             console.log("Processing item:", item);
             const barcode = item.Id;
             console.log("Barcode:", barcode);
@@ -284,46 +298,75 @@ let intervalID = "";
 
 $(document).ready(async function () {
   // Initialize the RFID vendor
-  await rfidVendor.init().then(initialized => {
+  const vendorInitialized = await rfidVendor.init().then(initialized => {
     if (!initialized) {
       display_rfid_failure();
     }
+    return initialized;
   });
 
-  // Checkin option on the top bar
-  $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
-    handle_action_change("checkin");
-    handle_one_at_a_time("checkin", "enable", $("#ret_barcode"));
-  });
+  // If no vendor found, don't show anything
+  if (!vendorInitialized) return;
 
-  // Renewal option on the top bar
-  $("#renew_search-tab,a[href='#renew_search']").on("click", function () {
-    handle_action_change("renew");
-    handle_one_at_a_time("checkin", "enable", $("#ren_barcode"));
-  });
+  // Always show the RFID Controls box (it contains the on/off toggle)
+  initFloatingResetButton();
 
-  // Catalog search on the top bar
-  $("#catalog_search-tab").on("click", function () {
-    handle_action_change("search");
+  // If RFID is disabled, stop here
+  if (!isRfidEnabled()) return;
 
-    let action = "search";
-    let security_setting = "ignore";
-    let barcode_input = $("#search-form");
-    let form_submit = $("#cat-search-block button");
-    let auto_submit_test_cb = () => {
-      return true; //FIXME: Make a plugin setting
-    };
-    handle_one_and_done(
-      action,
-      security_setting,
-      barcode_input,
-      form_submit,
-      auto_submit_test_cb
-    );
-  });
+  startRfidFunctionality();
+});
+
+function startRfidFunctionality() {
+  if (!rfid_functionality_started) {
+    rfid_functionality_started = true;
+
+    // Checkin option on the top bar
+    $("#checkin_search-tab,a[href='#checkin_search']").on("click", function () {
+      handle_action_change("checkin");
+      handle_one_at_a_time("checkin", "enable", $("#ret_barcode"));
+    });
+
+    // Renewal option on the top bar
+    $("#renew_search-tab,a[href='#renew_search']").on("click", function () {
+      handle_action_change("renew");
+      handle_one_at_a_time("checkin", "enable", $("#ren_barcode"));
+    });
+
+    // Catalog search on the top bar
+    $("#catalog_search-tab").on("click", function () {
+      handle_action_change("search");
+
+      let action = "search";
+      let security_setting = "ignore";
+      let barcode_input = $("#search-form");
+      let form_submit = $("#cat-search-block button");
+      let auto_submit_test_cb = () => {
+        return true; //FIXME: Make a plugin setting
+      };
+      handle_one_and_done(
+        action,
+        security_setting,
+        barcode_input,
+        form_submit,
+        auto_submit_test_cb
+      );
+    });
+  }
+
+  // Show barcodes box if it was previously hidden by toggle
+  if ($('#rfid-barcode-box').length) {
+    $('#rfid-barcode-box').show();
+  }
+
+  // Expand controls content
+  if ($('#rfid-reset-content').length) {
+    $('#rfid-reset-content').slideDown(200);
+    $('.rfid-reset-toggle').text('−');
+  }
 
   handle_visibility();
-});
+}
 
 function handle_tab_inactive() {
   if (intervalID) {
@@ -334,10 +377,13 @@ function handle_tab_inactive() {
 
 function initUserInterface() {
   initFloatingResetButton();
-  initFloatingBarcodeBox();
+  if (isRfidEnabled()) {
+    initFloatingBarcodeBox();
+  }
 }
 
 function handle_tab_active() {
+  if (!isRfidEnabled()) return;
   initiate_rfid_scanning();
 }
 
@@ -929,6 +975,8 @@ function poll_rfid_for_barcodes_batch(cb, no_wait) {
 
 // Create and initialize the floating box UI
 function initFloatingResetButton() {
+  if ($('#rfid-reset-box').length) return $('#rfid-reset-box');
+
   // Create the floating reset button
   const $reset_box = $(`
         <div id="rfid-reset-box" style="
@@ -976,6 +1024,12 @@ function initFloatingResetButton() {
                 <button id="rfid-reset-button" class="btn btn-danger w-100">
                     <i class="fa fa-refresh" aria-hidden="true"></i> Reset RFID
                 </button>
+            </div>
+            <div style="padding: 8px 15px; border-top: 1px solid #ddd;">
+                <div class="form-check form-switch" style="min-height: auto; padding-left: 2.5em;">
+                    <input class="form-check-input" type="checkbox" role="switch" id="rfid-enabled-toggle" style="cursor: pointer; width: 2.5em; height: 1.25em;" ${isRfidEnabled() ? 'checked' : ''}>
+                    <label class="form-check-label" for="rfid-enabled-toggle" style="cursor: pointer;">${isRfidEnabled() ? 'RFID Plugin Enabled' : 'RFID Plugin Disabled'}</label>
+                </div>
             </div>
         </div>
     `).appendTo('body');
@@ -1036,6 +1090,28 @@ function initFloatingResetButton() {
     localStorage.setItem('koha_plugin_rfid_show_reset_box', 'false');
   });
 
+  // RFID enable/disable toggle
+  $reset_box.on('change', '#rfid-enabled-toggle', function () {
+    const enabled = $(this).is(':checked');
+    setRfidEnabled(enabled);
+    $('label[for="rfid-enabled-toggle"]').text(enabled ? 'RFID Plugin Enabled' : 'RFID Plugin Disabled');
+
+    if (enabled) {
+      startRfidFunctionality();
+    } else {
+      // Stop scanning
+      if (intervalID) {
+        clearInterval(intervalID);
+        intervalID = null;
+      }
+      // Minimize controls content
+      $('#rfid-reset-content').slideUp(200);
+      $('.rfid-reset-toggle').text('+');
+      // Hide barcodes box
+      $('#rfid-barcode-box').hide();
+    }
+  });
+
   // Add click handler for the reset button
   $reset_box.on('click', '#rfid-reset-button', function (e) {
     e.stopPropagation();
@@ -1043,8 +1119,8 @@ function initFloatingResetButton() {
     initiate_rfid_scanning();
   });
 
-  // Check if the box was previously closed
-  if (localStorage.getItem('koha_plugin_rfid_show_reset_box') === 'false') {
+  // Minimize content if RFID is disabled or box was previously minimized
+  if (!isRfidEnabled() || localStorage.getItem('koha_plugin_rfid_show_reset_box') === 'false') {
     $reset_box.find('#rfid-reset-content').hide();
     $reset_box.find('.rfid-reset-toggle').text('+');
   }
@@ -1053,6 +1129,8 @@ function initFloatingResetButton() {
 }
 
 function initFloatingBarcodeBox() {
+  if ($('#rfid-barcode-box').length) return;
+
   // Create the floating container
   const $barcode_box = $(`
         <div id="rfid-barcode-box" style="
@@ -1286,10 +1364,10 @@ function updateProcessedBarcodeList() {
   $list.html(html);
 }
 
-function doAsyncPostAsPromise(method, args) {
+function doAsyncPostAsPromise(baseUrl, method, args) {
   return new Promise((resolve, reject) => {
     var req = new XMLHttpRequest;
-    req.open("POST", TAG_SERVICE_ROOT_URL + method, true);
+    req.open("POST", baseUrl + method, true);
     req.setRequestHeader("Content-Type", "application/json; charset=utf-8");
     req.onreadystatechange = function () {
       if (this.readyState == XMLHttpRequest.DONE) {
@@ -1304,10 +1382,10 @@ function doAsyncPostAsPromise(method, args) {
   });
 }
 
-function doAsyncGetAsPromise(method) {
+function doAsyncGetAsPromise(baseUrl, method) {
   return new Promise((resolve, reject) => {
     var req = new XMLHttpRequest;
-    req.open("GET", TAG_SERVICE_ROOT_URL + method, true);
+    req.open("GET", baseUrl + method, true);
     req.setRequestHeader("Content-Type", "application/json; charset=utf-8");
     req.onreadystatechange = function () {
       if (this.readyState == XMLHttpRequest.DONE) {
