@@ -1028,7 +1028,7 @@ function initFloatingResetButton() {
             <div style="padding: 8px 15px; border-top: 1px solid #ddd;">
                 <div class="form-check form-switch" style="min-height: auto; padding-left: 2.5em;">
                     <input class="form-check-input" type="checkbox" role="switch" id="rfid-enabled-toggle" style="cursor: pointer; width: 2.5em; height: 1.25em;" ${isRfidEnabled() ? 'checked' : ''}>
-                    <label class="form-check-label" for="rfid-enabled-toggle" style="cursor: pointer;">${isRfidEnabled() ? 'RFID Plugin Enabled' : 'RFID Plugin Disabled'}</label>
+                    <label class="form-check-label" for="rfid-enabled-toggle" style="cursor: pointer;">Enable RFID Plugin</label>
                 </div>
             </div>
         </div>
@@ -1094,8 +1094,6 @@ function initFloatingResetButton() {
   $reset_box.on('change', '#rfid-enabled-toggle', function () {
     const enabled = $(this).is(':checked');
     setRfidEnabled(enabled);
-    $('label[for="rfid-enabled-toggle"]').text(enabled ? 'RFID Plugin Enabled' : 'RFID Plugin Disabled');
-
     if (enabled) {
       startRfidFunctionality();
     } else {
