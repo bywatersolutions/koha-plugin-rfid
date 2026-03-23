@@ -1380,6 +1380,18 @@ function doAsyncPostAsPromise(baseUrl, method, args) {
   });
 }
 
+function errorDetail(req) {
+    if (0 == req.status) {
+        return "(send failed)";
+    }
+    try {
+        var detail = JSON.parse(req.responseText);
+        return req.status + ", " + detail.ErrorMessage;
+    } catch (err) { // probably not response from tag service
+        return req.status + ", " + req.statusText;
+    }
+}
+
 function doAsyncGetAsPromise(baseUrl, method) {
   return new Promise((resolve, reject) => {
     var req = new XMLHttpRequest;
