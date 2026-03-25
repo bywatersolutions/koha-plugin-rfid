@@ -214,26 +214,47 @@ const rfidVendor = {
     }
   },
 
+  // Try to initialize a specific vendor by name, returns true if alive
+  _tryVendor: async function (vendorName) {
+    const vendor = this.vendors[vendorName];
+    if (!vendor) return false;
+    try {
+      console.log(`Checking ${vendorName}`);
+      await vendor.init();
+      const isAlive = await vendor.checkAlive();
+      console.log(`Is ${vendorName} RFID reader alive?`, isAlive);
+      if (isAlive) {
+        this.currentVendor = vendor;
+        console.log(`Using ${vendorName} RFID reader at ${vendor.baseUrl}`);
+        localStorage.setItem('koha_plugin_rfid_vendor', vendorName);
+        return true;
+      }
+    } catch (error) {
+      console.error(`Error initializing ${vendorName}:`, error);
+    }
+    return false;
+  },
+
   // Initialize the RFID vendor
   init: async function () {
     console.log("INITIALIZING RFID VENDOR");
+
+    // Try cached vendor first for faster detection
+    const cachedVendor = localStorage.getItem('koha_plugin_rfid_vendor');
+    if (cachedVendor) {
+      console.log(`Trying cached vendor: ${cachedVendor}`);
+      if (await this._tryVendor(cachedVendor)) {
+        return true;
+      }
+      console.log(`Cached vendor ${cachedVendor} not available, scanning all`);
+      localStorage.removeItem('koha_plugin_rfid_vendor');
+    }
+
     // Try to detect which vendor is available
     for (const [vendorName, vendor] of Object.entries(this.vendors)) {
-      try {
-        console.log(`Checking ${vendorName}`);
-
-        await vendor.init();
-
-        const isAlive = await vendor.checkAlive();
-        console.log(`Is ${vendorName} RFID reader alive?`, isAlive);
-
-        if (isAlive) {
-          this.currentVendor = vendor;
-          console.log(`Using ${vendorName} RFID reader at ${vendor.baseUrl}`);
-          return true;
-        }
-      } catch (error) {
-        console.error(`Error initializing ${vendorName}:`, error);
+      if (vendorName === cachedVendor) continue; // Already tried
+      if (await this._tryVendor(vendorName)) {
+        return true;
       }
     }
 
