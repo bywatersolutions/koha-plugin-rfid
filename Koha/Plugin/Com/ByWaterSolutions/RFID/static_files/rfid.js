@@ -106,6 +106,7 @@ const rfidVendor = {
       name: 'bibliotheca',
       baseUrl: "http://localhost:21645/TagService/Web/",
       init: async function () {
+        /* FIXME: Webservice is returning "Method not allowed", no needed then?
         try {
           console.log("Bibliotheca RFID reader init start...");
           await doAsyncPostAsPromise(this.baseUrl, "ConnectReader", null);
@@ -113,6 +114,7 @@ const rfidVendor = {
         } catch (err) {
           console.log("Bibliotheca RFID reader init FAIL: " + err);
         }
+        */
       },
       checkAlive: async function () {
         // IsOnline is also an option
@@ -121,7 +123,7 @@ const rfidVendor = {
         try {
           var rslt = await doAsyncGetAsPromise(this.baseUrl, "IsConnected");
           console.log("IsConnected result", rslt);
-          is_alive = rslt.IsConnectedResult;
+          is_alive = rslt;
         } catch (err) {
           console.log("IsConnected FAIL: " + err);
         }
@@ -220,7 +222,7 @@ const rfidVendor = {
       try {
         console.log(`Checking ${vendorName}`);
 
-        vendor.init();
+        await vendor.init();
 
         const isAlive = await vendor.checkAlive();
         console.log(`Is ${vendorName} RFID reader alive?`, isAlive);
