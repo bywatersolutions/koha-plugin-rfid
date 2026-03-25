@@ -121,7 +121,7 @@ const rfidVendor = {
         try {
           var rslt = await doAsyncGetAsPromise(this.baseUrl, "IsConnected");
           console.log("IsConnected result", rslt);
-          is_alive = rslt.IsConnected;
+          is_alive = rslt.IsConnectedResult;
         } catch (err) {
           console.log("IsConnected FAIL: " + err);
         }
