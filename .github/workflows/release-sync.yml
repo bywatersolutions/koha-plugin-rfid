@@ -68,7 +68,7 @@ jobs:
       if: steps.check.outputs.needs_sync == 'true'
       run: |
         # Run the preversion script logic manually to update plugin file
-        sed -i -e "s/^our \$VERSION = .*/our \$VERSION = \"${{ steps.version.outputs.version }}\";/" Koha/Plugin/Com/ByWaterSolutions/RFID.pm
+        sed -i -e "s/^our \$VERSION *=.*/our \$VERSION         = \"${{ steps.version.outputs.version }}\";/" Koha/Plugin/Com/ByWaterSolutions/RFID.pm
         rm -f Koha/Plugin/Com/ByWaterSolutions/RFID.pm-e
 
     - name: Commit version updates

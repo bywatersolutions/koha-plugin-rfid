@@ -8,7 +8,7 @@
     "vinyl": "^3.0.0"
   },
   "scripts": {
-    "preversion": "sed -i -e \"s/^our \\$VERSION = .*/our \\$VERSION = \\\"$npm_new_version\\\";/\" Koha/Plugin/Com/ByWaterSolutions/RFID.pm; git add -u; rm -f Koha/Plugin/Com/ByWaterSolutions/RFID.pm-e",
+    "preversion": "sed -i -e \"s/^our \\$VERSION *=.*/our \\$VERSION         = \\\"$npm_new_version\\\";/\" Koha/Plugin/Com/ByWaterSolutions/RFID.pm; git add -u; rm -f Koha/Plugin/Com/ByWaterSolutions/RFID.pm-e",
     "test": "echo \"Error: no test specified\" && exit 1",
     "kpz": "node -e \"console.log(process.env.npm_package_name + '-v' + process.env.npm_package_version + '.kpz')\"",
     "print-name": "node -e \"console.log(process.env.npm_package_name)\"",
