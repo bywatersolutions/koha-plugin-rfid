@@ -298,19 +298,6 @@ const rfidVendor = {
   }
 };
 
-async function detect_rfid_interface() {
-  const is_circit = await detect_rfid_type_techlogic_circit();
-  if (is_circit) {
-    console.log('TechLogic CircIt detected');
-    return 'techlogic_circit';
-  } else {
-    console.log('TechLogic CircIt not detected');
-  }
-
-  display_rfid_failure();
-  return undefined;
-}
-
 // Sometimes we need to halt processing on non-batch pages and continue after the issue has been resolved
 let continue_processing = false;
 let intervalID = "";
