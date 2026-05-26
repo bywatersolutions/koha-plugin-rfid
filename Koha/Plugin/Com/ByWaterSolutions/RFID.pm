@@ -62,19 +62,12 @@ sub configure {
 
         ## Grab the values we already have for our settings, if any exist
         $template->param(
-            TechLogicCircItPort                  => $self->retrieve_data('TechLogicCircItPort'),
-            TechLogicCircItNonAdministrativeMode => $self->retrieve_data('TechLogicCircItNonAdministrativeMode'),
-            branches                             => \@branches,
+            branches => \@branches,
         );
 
         $self->output_html($template->output());
     }
     else {
-        $self->store_data({
-            TechLogicCircItPort                  => $cgi->param('TechLogicCircItPort'),
-            TechLogicCircItNonAdministrativeMode => $cgi->param('TechLogicCircItNonAdministrativeMode'),
-        });
-
         my @enabled_branchcodes = $cgi->multi_param('rfid_enabled_branchcodes');
         for my $lib (@libraries) {
             my $bc = $lib->branchcode;
@@ -110,13 +103,7 @@ sub intranet_js {
         return q{} if $rfid_disabled;
     }
 
-    my $TechLogicCircItPort = $self->retrieve_data('TechLogicCircItPort') || '9201';
-    my $TechLogicCircItNonAdministrativeMode = $self->retrieve_data('TechLogicCircItNonAdministrativeMode') || q{};
-    return qq{
-     <script>
-        const TechLogicCircItPort = "$TechLogicCircItPort";
-        const TechLogicCircItNonAdministrativeMode = "$TechLogicCircItNonAdministrativeMode";
-     </script>
+    return q{
      <script type="text/javascript" src="/api/v1/contrib/rfid/static/static_files/rfid.js"></script>
     };
 }

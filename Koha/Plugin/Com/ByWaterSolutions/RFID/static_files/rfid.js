@@ -182,11 +182,7 @@ const rfidVendor = {
     },
     circit: {
       name: 'circit',
-      port: TechLogicCircItNonAdministrativeMode
-        ? "80/Temporary_Listen_Addresses"
-        : TechLogicCircItPort
-          ? TechLogicCircItPort
-          : "9201",
+      port: "80/Temporary_Listen_Addresses",
       baseUrl: "",
       init: function () {
         this.baseUrl = `http://localhost:${this.port}`;
