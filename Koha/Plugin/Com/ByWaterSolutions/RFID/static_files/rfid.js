@@ -885,6 +885,23 @@ function handle_batch(
         }
       }
 
+      // Everything on the pad has already been processed. Don't append blank
+      // lines or resubmit the form. For auto-submitting actions like batch
+      // checkout, resubmitting reloads the page and the same already-seen items
+      // get picked up again, which makes the screen "jump" in an endless loop.
+      // Instead just keep polling so a fresh stack of items can be picked up
+      // when the librarian places one on the pad.
+      if (!unseen_barcodes.length) {
+        handle_batch(
+          action,
+          security_setting,
+          barcodes_textarea,
+          form_submit,
+          auto_submit_test_cb
+        );
+        return;
+      }
+
       barcodes_textarea.val(
         barcodes_textarea.val() + unseen_barcodes.join("\r\n") + "\r\n"
       );

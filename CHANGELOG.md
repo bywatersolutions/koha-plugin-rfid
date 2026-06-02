@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Batch checkout no longer cycles endlessly when already-processed items are left on the pad; the page stops resubmitting and waits for a new stack of items ([#9](https://github.com/bywatersolutions/koha-plugin-rfid/issues/9))
+
 ## [0.4.0-beta] - 2026-03-17
 
 ### Added
