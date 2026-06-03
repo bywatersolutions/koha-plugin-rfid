@@ -94,19 +94,30 @@ for vendor in $VENDORS; do
     echo ">> Vendor: $vendor  (emulator $script on $url)"
     echo "============================================================"
 
-    # Listen on both IPv4 and IPv6: the bibliotheca / circit vendors use the
-    # host "localhost", which Chromium often resolves to ::1 first, so an
-    # IPv4-only emulator would never be reached by the plugin.
+    # Listen on both loopback addresses: the bibliotheca / circit vendors use
+    # the host "localhost", which Chromium often resolves to ::1 first, so an
+    # IPv4-only emulator would never be reached by the plugin. Bind the
+    # specific loopback addresses ( 127.0.0.1 and [::1] ) rather than the
+    # wildcards "*" and "[::]" -- on Linux "[::]" is dual-stack and also grabs
+    # 0.0.0.0, which collides with "*" and makes the emulator fail to start.
     stop_emulator
     ( cd "$EMULATORS_DIR" && exec perl "$script" daemon \
-        -l "http://*:${port}" -l "http://[::]:${port}" ) &
+        -l "http://127.0.0.1:${port}" -l "http://[::1]:${port}" ) &
     EMULATOR_PID=$!
 
     # Wait for the emulator to answer
+    emulator_up=""
     for _ in $(seq 1 20); do
-        if curl -fs -o /dev/null "${url}/getitems"; then break; fi
+        if curl -fs -o /dev/null "${url}/getitems"; then emulator_up=1; break; fi
         sleep 0.5
     done
+
+    if [ -z "$emulator_up" ]; then
+        echo "!! Emulator for $vendor never came up on $url -- skipping" >&2
+        OVERALL_RC=1
+        stop_emulator
+        continue
+    fi
 
     if ! CYPRESS_baseUrl="$BASE_URL" CYPRESS_emulatorUrl="$url" \
         npx cypress run --project "$SCRIPT_DIR"; then
