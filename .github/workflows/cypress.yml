@@ -1,0 +1,105 @@
+name: Cypress E2E
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  cypress:
+    name: Cypress E2E (per vendor)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout plugin code
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      # Private repo of vendor RFID reader emulators. GHA_WORKFLOW_TOKEN must
+      # have read access to bywatersolutions/rfid-emulators.
+      - name: Checkout RFID emulators
+        uses: actions/checkout@v4
+        with:
+          repository: bywatersolutions/rfid-emulators
+          token: ${{ secrets.GHA_WORKFLOW_TOKEN }}
+          path: emulators
+
+      - name: Get Koha version branch name
+        id: koha-version
+        uses: "bywatersolutions/github-action-koha-get-version-by-label@v2"
+        with:
+          version-label: "main"
+
+      - name: Check out Koha
+        run: |
+          git clone --branch ${{ steps.koha-version.outputs.current-branch-name }} \
+            --single-branch --depth 1 \
+            https://github.com/Koha-Community/Koha.git "$GITHUB_WORKSPACE/kohaclone"
+
+      - name: Install koha-testing-docker
+        run: |
+          git clone https://gitlab.com/koha-community/koha-testing-docker.git "$GITHUB_WORKSPACE/ktd"
+          cp "$GITHUB_WORKSPACE/ktd/env/defaults.env" "$GITHUB_WORKSPACE/ktd/.env"
+          echo "$GITHUB_WORKSPACE/ktd/bin" >> "$GITHUB_PATH"
+
+      - name: Launch ktd with the plugin mounted
+        run: |
+          export LOCAL_USER_ID=$(id -u)
+          export KTD_HOME="$GITHUB_WORKSPACE/ktd"
+          export SYNC_REPO="$GITHUB_WORKSPACE/kohaclone"
+          export KOHA_IMAGE=main
+          ktd --name rfid --single-plugin "$GITHUB_WORKSPACE/plugin" up -d
+          ktd --name rfid --wait-ready 500
+
+      - name: Install and enable the plugin
+        run: |
+          export KTD_HOME="$GITHUB_WORKSPACE/ktd"
+          ktd --name rfid --shell --run "perl misc/devel/install_plugins.pl"
+          ktd --name rfid --shell --run "echo \"INSERT INTO plugin_data (plugin_class,plugin_key,plugin_value) VALUES ('Koha::Plugin::Com::ByWaterSolutions::RFID','__ENABLED__','1') ON DUPLICATE KEY UPDATE plugin_value='1';\" | koha-mysql kohadev"
+          ktd --name rfid --shell --run "sudo koha-plack --restart kohadev; flush_memcached"
+
+      - name: Install Mojolicious (to run the emulators)
+        run: sudo apt-get update && sudo apt-get install -y libmojolicious-perl
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Cypress and dependencies
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: plugin
+          runTests: false
+
+      - name: Run Cypress suite for each vendor
+        working-directory: plugin
+        env:
+          KTD_HOME: ${{ github.workspace }}/ktd
+          KTD_NAME: rfid
+          BASE_URL: http://localhost:8081
+          EMULATORS_DIR: ${{ github.workspace }}/emulators
+          VENDORS: "mksolutions bibliotheca"
+        run: bash t/cypress/run.sh
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: plugin/t/cypress/screenshots
+          if-no-files-found: ignore
+
+      - name: Show Koha logs on failure
+        if: failure()
+        run: |
+          export KTD_HOME="$GITHUB_WORKSPACE/ktd"
+          ktd --name rfid --shell --run "tail -80 /var/log/koha/kohadev/plack-intranet-error.log" || true
+
+      - name: Cleanup ktd
+        if: always()
+        run: |
+          export KTD_HOME="$GITHUB_WORKSPACE/ktd"
+          ktd --name rfid down || true
