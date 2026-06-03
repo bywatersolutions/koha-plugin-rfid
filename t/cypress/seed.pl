@@ -42,9 +42,10 @@ C4::Context->set_preference( "BatchCheckoutsValidCategories", $categorycode );
 warn "Enabled BatchCheckouts for category '$categorycode' at library '$branchcode'\n";
 
 # The real CircIT reader uses privileged port 80; point the plugin at the
-# unprivileged port the circit emulator runs on during testing. This MUST match
-# CIRCIT_TEST_PORT in t/cypress/run.sh.
-my $circit_test_port = 8090;
+# unprivileged port the circit emulator runs on during testing. The runner
+# passes that port ( CIRCIT_TEST_PORT ) as the first argument so there's a
+# single source of truth; fall back to 8090 if run on its own.
+my $circit_test_port = ( $ARGV[0] && $ARGV[0] =~ /\A[0-9]+\z/ ) ? $ARGV[0] : 8090;
 C4::Context->set_preference( "RFIDCircitPort", $circit_test_port );
 warn "Set RFIDCircitPort to $circit_test_port\n";
 

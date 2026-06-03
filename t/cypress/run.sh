@@ -37,8 +37,9 @@ VENDORS="${VENDORS:-mksolutions bibliotheca circit}"
 
 # Port the circit emulator + plugin use during testing. The real reader uses
 # privileged port 80 ( which also collides with the ktd Traefik proxy ), so the
-# suite overrides it via the RFIDCircitPort system preference set in seed.pl;
-# this value MUST match the CIRCIT_PORT seed.pl writes.
+# suite runs the emulator on this port and passes it to seed.pl, which points
+# the plugin at it via the RFIDCircitPort system preference. This is the single
+# source of truth for the circit test port.
 CIRCIT_TEST_PORT="${CIRCIT_TEST_PORT:-8090}"
 
 # Resolve the plugin repo root ( two levels up from this script )
@@ -81,7 +82,7 @@ trap stop_emulator EXIT
 echo ">> Seeding test data in ktd instance '$KTD_NAME'"
 mkdir -p "$SCRIPT_DIR/fixtures"
 SEED_JSON="$("$KTD" --name "$KTD_NAME" --shell --run \
-    "perl /kohadevbox/plugins/$PLUGIN_NAME/t/cypress/seed.pl" 2>/dev/null | tail -1)"
+    "perl /kohadevbox/plugins/$PLUGIN_NAME/t/cypress/seed.pl $CIRCIT_TEST_PORT" 2>/dev/null | tail -1)"
 if ! echo "$SEED_JSON" | grep -q borrowernumber; then
     echo "!! Seeding failed; got: $SEED_JSON" >&2
     exit 1
