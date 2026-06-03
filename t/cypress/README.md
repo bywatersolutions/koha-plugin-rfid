@@ -86,7 +86,10 @@ CYPRESS_emulatorUrl=http://127.0.0.1:4039 \
 - **One emulator at a time** (see above).
 - Emulators must listen on **both IPv4 and IPv6** — the bibliotheca/circit
   vendors use the host `localhost`, which Chromium often resolves to `::1`
-  first. The runner launches them with `-l http://*:PORT -l http://[::]:PORT`.
+  first. The runner launches them bound to both loopback addresses
+  (`-l http://127.0.0.1:PORT -l http://[::1]:PORT`). Note: don't use the
+  wildcards `*` and `[::]` together — on Linux `[::]` is dual-stack and also
+  grabs `0.0.0.0`, colliding with `*` so the emulator fails to start.
 - **circit** is omitted from the default `VENDORS`: it expects to listen on
   privileged port 80 under the `/Temporary_Listen_Addresses` path, which
   collides with the ktd Traefik proxy. Run it separately if needed.
