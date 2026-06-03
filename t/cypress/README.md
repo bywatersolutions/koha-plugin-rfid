@@ -90,9 +90,13 @@ CYPRESS_emulatorUrl=http://127.0.0.1:4039 \
   (`-l http://127.0.0.1:PORT -l http://[::1]:PORT`). Note: don't use the
   wildcards `*` and `[::]` together — on Linux `[::]` is dual-stack and also
   grabs `0.0.0.0`, colliding with `*` so the emulator fails to start.
-- **circit** is omitted from the default `VENDORS`: it expects to listen on
-  privileged port 80 under the `/Temporary_Listen_Addresses` path, which
-  collides with the ktd Traefik proxy. Run it separately if needed.
+- **circit** runs on an unprivileged port during testing. The real reader uses
+  port 80 under the `/Temporary_Listen_Addresses` path (which also collides with
+  the ktd Traefik proxy), so `seed.pl` sets the `RFIDCircitPort` system
+  preference to point the plugin at `CIRCIT_TEST_PORT` (default 8090) and the
+  runner starts the emulator there. The plugin's CircIT port can be overridden
+  in production too, via the `KOHA_RFID_CIRCIT_PORT` environment variable or the
+  `RFIDCircitPort` system preference.
 - The issue #9 regression test seeds the plugin's `processed_barcodes`
   localStorage and asserts the batch checkout page never reloads — reproducing
   "the screen keeps jumping" and proving the fix.

@@ -41,6 +41,13 @@ C4::Context->set_preference( "BatchCheckouts",               1 );
 C4::Context->set_preference( "BatchCheckoutsValidCategories", $categorycode );
 warn "Enabled BatchCheckouts for category '$categorycode' at library '$branchcode'\n";
 
+# The real CircIT reader uses privileged port 80; point the plugin at the
+# unprivileged port the circit emulator runs on during testing. This MUST match
+# CIRCIT_TEST_PORT in t/cypress/run.sh.
+my $circit_test_port = 8090;
+C4::Context->set_preference( "RFIDCircitPort", $circit_test_port );
+warn "Set RFIDCircitPort to $circit_test_port\n";
+
 # Find or create the test patron
 my $patron = Koha::Patrons->find( { cardnumber => $cardnumber } );
 unless ($patron) {
