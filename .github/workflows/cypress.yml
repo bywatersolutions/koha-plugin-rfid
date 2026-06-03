@@ -81,7 +81,7 @@ jobs:
           KTD_NAME: rfid
           BASE_URL: http://localhost:8081
           EMULATORS_DIR: ${{ github.workspace }}/emulators
-          VENDORS: "mksolutions bibliotheca"
+          VENDORS: "mksolutions bibliotheca circit"
         run: bash t/cypress/run.sh
 
       - name: Upload screenshots on failure

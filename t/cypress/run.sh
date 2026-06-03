@@ -33,7 +33,13 @@ KTD_NAME="${KTD_NAME:-rfidtest}"
 KTD_HOME="${KTD_HOME:-$HOME/repos/koha-testing-docker}"
 BASE_URL="${BASE_URL:-http://${KTD_NAME}-intra.localhost}"
 EMULATORS_DIR="${EMULATORS_DIR:-$HOME/repos/rfid-emulators}"
-VENDORS="${VENDORS:-mksolutions bibliotheca}"
+VENDORS="${VENDORS:-mksolutions bibliotheca circit}"
+
+# Port the circit emulator + plugin use during testing. The real reader uses
+# privileged port 80 ( which also collides with the ktd Traefik proxy ), so the
+# suite overrides it via the RFIDCircitPort system preference set in seed.pl;
+# this value MUST match the CIRCIT_PORT seed.pl writes.
+CIRCIT_TEST_PORT="${CIRCIT_TEST_PORT:-8090}"
 
 # Resolve the plugin repo root ( two levels up from this script )
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,9 +47,9 @@ PLUGIN_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PLUGIN_NAME="$(basename "$PLUGIN_DIR")"
 KTD="$KTD_HOME/bin/ktd"
 
-# Per-vendor emulator script + control URL. circit is intentionally omitted
-# from the default list: it expects to listen on privileged port 80 under the
-# /Temporary_Listen_Addresses path, which collides with the ktd Traefik proxy.
+# Per-vendor emulator script. circit normally uses privileged port 80; the
+# suite runs it on CIRCIT_TEST_PORT instead ( see seed.pl, which points the
+# plugin at that port via the RFIDCircitPort system preference ).
 emulator_script() {
     case "$1" in
         mksolutions) echo "mksolutions_emulator.pl" ;;
@@ -56,7 +62,7 @@ emulator_port() {
     case "$1" in
         mksolutions) echo "4039" ;;
         bibliotheca) echo "21645" ;;
-        circit)      echo "80" ;;
+        circit)      echo "$CIRCIT_TEST_PORT" ;;
         *) echo "unknown vendor: $1" >&2; return 1 ;;
     esac
 }
