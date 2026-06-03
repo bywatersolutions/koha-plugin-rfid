@@ -1,0 +1,95 @@
+# RFID plugin Cypress tests
+
+End-to-end tests for the RFID plugin. They drive a real Koha staff client in a
+browser and a real RFID reader emulator, exercising the plugin the same way a
+librarian's workstation does.
+
+## How it fits together
+
+```
+  Cypress (browser on host)
+        |  visits Koha staff client            -> ktd Koha (staff client)
+        |  plugin JS polls the RFID reader     -> RFID emulator (host, one vendor)
+        |  cy.request sets items "on the pad"   -> RFID emulator control API
+```
+
+- The plugin auto-detects the live RFID reader by probing each vendor in turn,
+  so **only one emulator may run at a time**. The suite is vendor-agnostic and
+  is run once per emulator; the same specs must pass for every vendor.
+- All three vendor emulators expose the same control API
+  (`POST /api/barcodes`, `GET /getitems`), so the `setPad` / `resetPad` helpers
+  work regardless of which vendor is running. The runner points them at the
+  live emulator via `CYPRESS_emulatorUrl`.
+
+## Layout
+
+| Path | Purpose |
+|------|---------|
+| `cypress.config.js` | Config + env defaults (Koha URL, emulator URL, fixtures) |
+| `support/commands.js` | `loginToKoha`, `setPad`, `resetPad`, `visitBatchCheckout`, ... |
+| `support/e2e.js` | Per-test reset of plugin localStorage + the pad |
+| `integration/smoke.cy.js` | Plugin loads and detects the running reader |
+| `integration/batch_checkout.cy.js` | Happy path + issue #9 regression |
+| `seed.pl` | Creates the deterministic test patron + items (runs inside ktd) |
+| `fixtures/seed.json` | Written by the runner from `seed.pl`'s output |
+| `run.sh` | Runs the whole suite once per vendor emulator |
+
+## Prerequisites
+
+1. The **rfid-emulators** repo checked out (private:
+   `git@github.com:bywatersolutions/rfid-emulators.git`), with Perl +
+   Mojolicious available to run them.
+2. A **ktd** instance with the plugin mounted, installed, and **enabled**.
+3. Node + the plugin's dev dependencies (`npm install`, which installs Cypress).
+
+### One-time ktd setup
+
+```sh
+# From the plugin repo root. Use --proxy locally so it doesn't fight other ktd
+# instances for ports 8080/8081; the staff client is then at
+# http://<name>-intra.localhost
+SYNC_REPO=/path/to/koha \
+  ktd --proxy --name rfidtest --single-plugin "$(pwd)" up -d
+ktd --name rfidtest --wait-ready 300
+
+# Install AND enable the plugin, then restart so its API/static routes mount
+ktd --name rfidtest --shell --run "perl misc/devel/install_plugins.pl"
+ktd --name rfidtest --shell --run \
+  "echo \"INSERT INTO plugin_data (plugin_class,plugin_key,plugin_value) \
+    VALUES ('Koha::Plugin::Com::ByWaterSolutions::RFID','__ENABLED__','1') \
+    ON DUPLICATE KEY UPDATE plugin_value='1';\" | koha-mysql kohadev"
+ktd --name rfidtest --shell --run "sudo koha-plack --restart kohadev; flush_memcached"
+```
+
+## Running
+
+The runner starts each emulator, runs the suite, then stops it:
+
+```sh
+KTD_NAME=rfidtest \
+BASE_URL=http://rfidtest-intra.localhost \
+EMULATORS_DIR=/path/to/rfid-emulators \
+VENDORS="mksolutions bibliotheca" \
+  bash t/cypress/run.sh
+```
+
+Or via npm scripts (against a single, already-running emulator):
+
+```sh
+CYPRESS_baseUrl=http://rfidtest-intra.localhost \
+CYPRESS_emulatorUrl=http://127.0.0.1:4039 \
+  npm run cypress:open      # interactive
+```
+
+## Notes / gotchas
+
+- **One emulator at a time** (see above).
+- Emulators must listen on **both IPv4 and IPv6** — the bibliotheca/circit
+  vendors use the host `localhost`, which Chromium often resolves to `::1`
+  first. The runner launches them with `-l http://*:PORT -l http://[::]:PORT`.
+- **circit** is omitted from the default `VENDORS`: it expects to listen on
+  privileged port 80 under the `/Temporary_Listen_Addresses` path, which
+  collides with the ktd Traefik proxy. Run it separately if needed.
+- The issue #9 regression test seeds the plugin's `processed_barcodes`
+  localStorage and asserts the batch checkout page never reloads — reproducing
+  "the screen keeps jumping" and proving the fix.

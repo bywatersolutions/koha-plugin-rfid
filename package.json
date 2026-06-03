@@ -3,6 +3,7 @@
   "version": "0.7.1",
   "description": "Koha RFID Plugin",
   "devDependencies": {
+    "cypress": "^13.15.0",
     "gulp": "^4.0.2",
     "gulp-cli": "^3.0.0",
     "vinyl": "^3.0.0"
@@ -12,7 +13,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "kpz": "node -e \"console.log(process.env.npm_package_name + '-v' + process.env.npm_package_version + '.kpz')\"",
     "print-name": "node -e \"console.log(process.env.npm_package_name)\"",
-    "build": "gulp build"
+    "build": "gulp build",
+    "cypress:open": "cypress open --project t/cypress",
+    "cypress:run": "cypress run --project t/cypress",
+    "cypress:suite": "bash t/cypress/run.sh"
   },
   "repository": {
     "type": "git",
