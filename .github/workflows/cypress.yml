@@ -13,14 +13,14 @@ jobs:
 
     steps:
       - name: Checkout plugin code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: plugin
 
       # Private repo of vendor RFID reader emulators. GHA_WORKFLOW_TOKEN must
       # have read access to bywatersolutions/rfid-emulators.
       - name: Checkout RFID emulators
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: bywatersolutions/rfid-emulators
           token: ${{ secrets.GHA_WORKFLOW_TOKEN }}
@@ -64,12 +64,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libmojolicious-perl
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
       - name: Install Cypress and dependencies
-        uses: cypress-io/github-action@v6
+        uses: cypress-io/github-action@v7
         with:
           working-directory: plugin
           runTests: false
@@ -86,7 +86,7 @@ jobs:
 
       - name: Upload screenshots on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cypress-screenshots
           path: plugin/t/cypress/screenshots
