@@ -103,7 +103,24 @@ sub intranet_js {
         return q{} if $rfid_disabled;
     }
 
-    return q{
+    # The CircIT reader port can be overridden for non-standard installs or for
+    # testing, via the KOHA_RFID_CIRCIT_PORT environment variable or the
+    # RFIDCircitPort system preference ( the env var wins if both are set ).
+    my $circit_port = $ENV{KOHA_RFID_CIRCIT_PORT};
+    $circit_port = C4::Context->preference('RFIDCircitPort')
+        unless defined $circit_port && $circit_port ne q{};
+
+    my $config_js = q{};
+    # Only accept a plain numeric port, so nothing unsafe ends up in the page
+    if ( defined $circit_port && $circit_port =~ /\A[0-9]{1,5}\z/ ) {
+        $config_js = qq{
+     <script type="text/javascript">
+       window.koha_plugin_rfid = window.koha_plugin_rfid || {};
+       window.koha_plugin_rfid.circit_port = "$circit_port";
+     </script>};
+    }
+
+    return $config_js . q{
      <script type="text/javascript" src="/api/v1/contrib/rfid/static/static_files/rfid.js"></script>
     };
 }

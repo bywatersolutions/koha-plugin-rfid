@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The CircIT reader port can be overridden via the `KOHA_RFID_CIRCIT_PORT` environment variable or the `RFIDCircitPort` system preference (defaults to port 80 under `/Temporary_Listen_Addresses`)
+
 ### Fixed
 
 - Checkout now halts on the "needs confirmation" alert for an available item that has an untrapped hold. The confirmation on the checkout page uses the `#circ_needsconfirmation` id, not the `#circ-needsconfirmation-modal` id used on the checkin page, so the plugin no longer recognized it and could skip past the held item without the librarian acting on it.

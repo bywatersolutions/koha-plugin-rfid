@@ -182,10 +182,18 @@ const rfidVendor = {
     },
     circit: {
       name: 'circit',
-      port: "80/Temporary_Listen_Addresses",
+      // The Tech Logic CircIT reader listens on port 80 by default, serving
+      // its API under the "/Temporary_Listen_Addresses" path. The port can be
+      // overridden ( e.g. for testing, or non-standard installs ) via the
+      // koha_plugin_rfid.circit_port value the plugin injects into the page.
+      port: 80,
+      path: "/Temporary_Listen_Addresses",
       baseUrl: "",
       init: function () {
-        this.baseUrl = `http://localhost:${this.port}`;
+        const override =
+          window.koha_plugin_rfid && window.koha_plugin_rfid.circit_port;
+        const port = override || this.port;
+        this.baseUrl = `http://localhost:${port}${this.path}`;
       },
       checkAlive: async function () {
         try {
