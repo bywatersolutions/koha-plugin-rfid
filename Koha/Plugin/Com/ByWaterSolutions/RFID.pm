@@ -9,7 +9,7 @@ use Koha::Libraries;
 
 use base qw(Koha::Plugins::Base);
 
-our $VERSION         = "0.7.0";
+our $VERSION         = "0.7.1";
 our $MINIMUM_VERSION = "{MINIMUM_VERSION}";
 
 ## Here is our metadata, some keys are required, some are optional
