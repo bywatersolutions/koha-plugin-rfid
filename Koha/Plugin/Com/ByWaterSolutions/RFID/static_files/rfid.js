@@ -172,10 +172,10 @@ const rfidVendor = {
           dataType: "json",
           contentType: "application/json",
           async: false,
-          method: "PUT",
+          method: "POST",
           data: JSON.stringify({
             tagId: barcode,
-            IsSecured: bitValue ? true : false
+            isSecured: bitValue ? true : false
           })
         });
       }
