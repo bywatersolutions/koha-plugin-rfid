@@ -353,6 +353,7 @@ const RFID_CONDITIONS = [
     showContinueButton: false,
   },
   { key: "hold_found", actions: ["checkin"], selector: "#hold-found1", klass: "mandatory" },
+  { key: "hold_found_modal", actions: ["checkin"], selector: "#hold-found-modal", klass: "mandatory" },
   { key: "recalled", actions: ["checkin"], selector: "#recalled", klass: "mandatory" },
   { key: "recalled_waiting", actions: ["checkin"], selector: "#recalledwaiting", klass: "mandatory" },
   { key: "item_transfer", actions: ["checkin"], selector: "#item-transfer-modal", klass: "mandatory" },
