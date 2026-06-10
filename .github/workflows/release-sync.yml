@@ -71,10 +71,23 @@ jobs:
         sed -i -e "s/^our \$VERSION *=.*/our \$VERSION         = \"${{ steps.version.outputs.version }}\";/" Koha/Plugin/Com/ByWaterSolutions/RFID.pm
         rm -f Koha/Plugin/Com/ByWaterSolutions/RFID.pm-e
 
+    - name: Stamp CHANGELOG version
+      if: steps.check.outputs.needs_sync == 'true'
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        DATE=$(date +%Y-%m-%d)
+        # Only stamp if [Unreleased] has entries, so we never create an empty version section
+        if awk '/^## \[Unreleased\]/{f=1;next} /^## \[/{f=0} f && /[^[:space:]]/{found=1} END{exit !found}' CHANGELOG.md; then
+          # Promote the [Unreleased] entries to a dated version section, leaving a fresh empty [Unreleased] on top
+          sed -i "0,/^## \[Unreleased\]/s//## [Unreleased]\n\n## [${VERSION}] - ${DATE}/" CHANGELOG.md
+        else
+          echo "No [Unreleased] entries to stamp"
+        fi
+
     - name: Commit version updates
       if: steps.check.outputs.needs_sync == 'true'
       run: |
-        git add package.json package-lock.json Koha/Plugin/Com/ByWaterSolutions/RFID.pm
+        git add package.json package-lock.json Koha/Plugin/Com/ByWaterSolutions/RFID.pm CHANGELOG.md
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
