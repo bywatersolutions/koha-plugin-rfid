@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Checkout now halts on the "needs confirmation" alert for an available item that has an untrapped hold. The confirmation on the checkout page uses the `#circ_needsconfirmation` id, not the `#circ-needsconfirmation-modal` id used on the checkin page, so the plugin no longer recognized it and could skip past the held item without the librarian acting on it.
 - Batch checkout no longer cycles endlessly when already-processed items are left on the pad; the page stops resubmitting and waits for a new stack of items ([#9](https://github.com/bywatersolutions/koha-plugin-rfid/issues/9))
 
 ## [0.4.0-beta] - 2026-03-17

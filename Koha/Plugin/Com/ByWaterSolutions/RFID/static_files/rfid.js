@@ -454,11 +454,16 @@ function handle_one_at_a_time(
     console.log("WRONG TRANSFER");
     // Do nothing, the built in modal will reload the page when a button in it is clicked
   } else if (
-    $("#circ-needsconfirmation-modal").length &&
+    // Checkin uses the modal #circ-needsconfirmation-modal, checkout uses the
+    // inline alert #circ_needsconfirmation. Both wrap a "don't process" deny button.
+    ($("#circ-needsconfirmation-modal").length ||
+      $("#circ_needsconfirmation").length) &&
     !continue_processing
   ) {
     console.log("NEEDS CONFIRMATION");
-    const button = $("#circ-needsconfirmation-modal button.deny");
+    const button = $(
+      "#circ-needsconfirmation-modal button.deny, #circ_needsconfirmation button.deny"
+    );
     button.on("click", function () {
       continue_processing = true;
       initiate_rfid_scanning();
