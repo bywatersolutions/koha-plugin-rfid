@@ -9,10 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional checkin/checkout halt conditions are now configurable per library. Each informational condition can be set to halt RFID auto-processing or be ignored, with a global default and an optional per-branch override. Conditions that require librarian interaction (holds, confirmations, transfers) always halt and are not configurable.
 - The CircIT reader port can be overridden via the `KOHA_RFID_CIRCIT_PORT` environment variable or the `RFIDCircitPort` system preference (defaults to port 80 under `/Temporary_Listen_Addresses`)
 
 ### Fixed
 
+- The plugin now halts on checkin confirmation and recall modals it previously missed in current Koha: the trapped-hold confirmation (`#hold-found-modal`), the recall modals (`#recalled`, `#recalledwaiting`), and the bundle contents confirmation (`#bundle-needsconfirmation-modal`). Stale selectors that no longer exist in Koha (`#hold-found2`, `ret_ispermenant`) were removed.
+- Checkout now halts on hard blockers (the `#circ_impossible` alert), so the librarian notices when an item could not be checked out instead of the plugin silently moving on.
 - Checkout now halts on the "needs confirmation" alert for an available item that has an untrapped hold. The confirmation on the checkout page uses the `#circ_needsconfirmation` id, not the `#circ-needsconfirmation-modal` id used on the checkin page, so the plugin no longer recognized it and could skip past the held item without the librarian acting on it.
 - Batch checkout no longer cycles endlessly when already-processed items are left on the pad; the page stops resubmitting and waits for a new stack of items ([#9](https://github.com/bywatersolutions/koha-plugin-rfid/issues/9))
 
