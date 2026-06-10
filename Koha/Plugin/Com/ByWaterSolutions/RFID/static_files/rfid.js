@@ -310,6 +310,149 @@ const rfidVendor = {
 let continue_processing = false;
 let intervalID = "";
 
+// Catalog of conditions that interrupt one-at-a-time checkout/checkin/renew.
+//
+// Each entry maps a Koha dialog/message to whether the plugin should halt
+// auto-processing when it appears. "mandatory" conditions require librarian
+// interaction and always halt. "optional" conditions are informational; each
+// library decides whether they halt via the plugin configuration, injected as
+// window.koha_plugin_rfid.halt_conditions. The 'default' is used when the
+// library has expressed no preference, and reproduces the plugin's prior
+// behavior.
+//
+// The optional 'key' values must stay in sync with @OPTIONAL_CONDITIONS in
+// RFID.pm, which builds the config UI and the injected halt_conditions map.
+const RFID_CONDITIONS = [
+  // --- Mandatory: librarian interaction required, always halts ---
+  {
+    // Checkout renders an inline alert ( #circ_needsconfirmation ), checkin a
+    // modal ( #circ-needsconfirmation-modal ); both wrap a "don't process"
+    // deny button we wire to resume scanning.
+    key: "needsconfirmation",
+    actions: ["checkout", "checkin"],
+    selector: "#circ-needsconfirmation-modal, #circ_needsconfirmation",
+    klass: "mandatory",
+    showContinueButton: false,
+    custom: function () {
+      const button = $(
+        "#circ-needsconfirmation-modal button.deny, #circ_needsconfirmation button.deny"
+      );
+      button.on("click", function () {
+        continue_processing = true;
+        initiate_rfid_scanning();
+      });
+    },
+  },
+  {
+    // The built-in modal reloads the page itself when a button is clicked, so
+    // we just halt and add no button of our own.
+    key: "wrong_transfer",
+    actions: ["checkin"],
+    selector: "#wrong-transfer-modal",
+    klass: "mandatory",
+    showContinueButton: false,
+  },
+  { key: "hold_found", actions: ["checkin"], selector: "#hold-found1", klass: "mandatory" },
+  { key: "recalled", actions: ["checkin"], selector: "#recalled", klass: "mandatory" },
+  { key: "recalled_waiting", actions: ["checkin"], selector: "#recalledwaiting", klass: "mandatory" },
+  { key: "item_transfer", actions: ["checkin"], selector: "#item-transfer-modal", klass: "mandatory" },
+  { key: "bundle_confirmation", actions: ["checkin"], selector: "#bundle-needsconfirmation-modal", klass: "mandatory" },
+  { key: "wrong_branch", actions: ["checkin"], selector: "#wrong-branch-modal", klass: "mandatory" },
+  {
+    // button.approve also appears on checkout confirmation, so this is scoped
+    // to the renew page only.
+    key: "renew_approval",
+    actions: ["renew"],
+    selector: "button.approve",
+    klass: "mandatory",
+    showContinueButton: false,
+  },
+
+  // --- Optional: informational, library decides ( default reproduces prior behavior ) ---
+  // Checkout hard blockers ( item cannot be issued; no confirm option )
+  { key: "circ_impossible", actions: ["checkout"], selector: "#circ_impossible", klass: "optional", default: true },
+
+  // Checkin messages that halted by default before this was configurable
+  { key: "restricted_backdated", actions: ["checkin"], selector: "#restricted_backdated", klass: "optional", default: true },
+  { key: "transfer_trigger", actions: ["checkin"], selector: "#transfer-trigger", klass: "optional", default: true },
+  { key: "ret_badbarcode", actions: ["checkin"], selector: "p.problem.ret_badbarcode", klass: "optional", default: true },
+  { key: "ret_blocked", actions: ["checkin"], selector: "p.problem.ret_blocked", klass: "optional", default: true },
+  { key: "ret_charged", actions: ["checkin"], selector: "p.problem.ret_charged", klass: "optional", default: true },
+  { key: "ret_datacorrupt", actions: ["checkin"], selector: "p.problem.ret_datacorrupt", klass: "optional", default: true },
+  { key: "ret_refund", actions: ["checkin"], selector: "p.problem.ret_refund", klass: "optional", default: true },
+  { key: "ret_restored", actions: ["checkin"], selector: "p.problem.ret_restored", klass: "optional", default: true },
+  { key: "ret_withdrawn", actions: ["checkin"], selector: "p.problem.ret_withdrawn", klass: "optional", default: true },
+  { key: "ret_checkinmsg", actions: ["checkin"], selector: "p.ret_checkinmsg", klass: "optional", default: true },
+
+  // Checkin messages not previously halted ( default ignore preserves behavior )
+  { key: "ret_notissued", actions: ["checkin"], selector: "p.problem.ret_notissued", klass: "optional", default: false },
+  { key: "ret_localuse", actions: ["checkin"], selector: "p.problem.ret_localuse", klass: "optional", default: false },
+  { key: "ret_transferred", actions: ["checkin"], selector: "p.problem.ret_transferred", klass: "optional", default: false },
+  { key: "ret_checkedin", actions: ["checkin"], selector: "p.problem.ret_checkedin", klass: "optional", default: false },
+  { key: "ret_debarred", actions: ["checkin"], selector: "p.problem.ret_debarred", klass: "optional", default: false },
+  { key: "ret_prevdebarred", actions: ["checkin"], selector: "p.problem.ret_prevdebarred", klass: "optional", default: false },
+  { key: "ret_foreverdebarred", actions: ["checkin"], selector: "p.problem.ret_foreverdebarred", klass: "optional", default: false },
+  { key: "ret_nflupdate", actions: ["checkin"], selector: "p.problem.ret_nflupdate", klass: "optional", default: false },
+  { key: "ret_location_update", actions: ["checkin"], selector: "p.problem.ret_location_update", klass: "optional", default: false },
+  { key: "rotating_collection", actions: ["checkin"], selector: "#rotating-collection", klass: "optional", default: false },
+  { key: "bundle_missing_items", actions: ["checkin"], selector: "#bundle_missing_items", klass: "optional", default: false },
+];
+
+// Is halting enabled for an optional condition? Reads the per-library config
+// injected as window.koha_plugin_rfid.halt_conditions; falls back to the
+// catalog default when the library has expressed no preference for this key.
+function is_condition_halt_enabled(key, default_value) {
+  const cfg =
+    (window.koha_plugin_rfid && window.koha_plugin_rfid.halt_conditions) || {};
+  if (Object.prototype.hasOwnProperty.call(cfg, key)) {
+    const value = cfg[key];
+    return value === true || value === "1" || value === 1;
+  }
+  return default_value;
+}
+
+// Walk the catalog for the current action and decide whether to halt. Returns
+// whether to halt, whether to show the generic "Continue processing" button
+// ( suppressed for dialogs that wire their own buttons ), and any custom button
+// wiring to run.
+function compute_halt(action) {
+  let halt = false;
+  let showContinueButton = true;
+  const customWirings = [];
+
+  RFID_CONDITIONS.forEach(function (cond) {
+    if (!cond.actions.includes(action)) return;
+    if (!$(cond.selector).length) return;
+
+    const should_halt =
+      cond.klass === "mandatory"
+        ? true
+        : is_condition_halt_enabled(cond.key, cond.default);
+    if (!should_halt) return;
+
+    halt = true;
+    if (cond.showContinueButton === false) showContinueButton = false;
+    if (cond.custom) customWirings.push(cond.custom);
+  });
+
+  return {
+    halt: halt,
+    showContinueButton: showContinueButton,
+    customWirings: customWirings,
+  };
+}
+
+// Append a "Continue processing RFID tags" button to a dialog and run the
+// given callback when the librarian clicks it.
+function render_continue_button(container, onContinue) {
+  const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
+  container.append(btn);
+  container.on("click", "button.rfid-continue", function () {
+    $("button.rfid-continue").hide();
+    onContinue();
+  });
+}
+
 $(document).ready(async function () {
   // Initialize the RFID vendor
   const vendorInitialized = await rfidVendor.init().then(initialized => {
@@ -419,11 +562,6 @@ function handle_one_at_a_time(
 ) {
   console.log("handle_one_at_a_time");
 
-  let halt = false;
-
-  // Some dialogs have their own buttons and the "Continue processing" button is not needed
-  let show_continue_processing_button = true;
-
   barcode_input = barcode_input ? barcode_input : $("#barcode");
   form_submit = form_submit
     ? form_submit
@@ -431,59 +569,21 @@ function handle_one_at_a_time(
 
   const dialog_alert_message = $("div.alert");
 
-  //TODO: Make this list configurable from the plugin interface
-  if (
-    $("#hold-found1").length ||
-    $("#recalled").length ||
-    $("#recalledwaiting").length ||
-    $("#item-transfer-modal").length ||
-    $("#bundle-needsconfirmation-modal").length ||
-    $("#restricted_backdated").length ||
-    $("#transfer-trigger").length ||
-    $("#wrong-branch-modal").length ||
-    $("p.problem.ret_badbarcode").length ||
-    $("p.problem.ret_blocked").length ||
-    $("p.problem.ret_charged").length ||
-    $("p.problem.ret_datacorrupt").length ||
-    $("p.problem.ret_refund").length ||
-    $("p.problem.ret_restored").length ||
-    $("p.problem.ret_withdrawn").length ||
-    $("p.ret_checkinmsg").length
-  ) {
-    halt = true;
-  }
+  // Decide whether to halt based on the condition catalog and per-library
+  // config. Mandatory conditions ( librarian interaction required ) always
+  // halt; optional conditions halt only when enabled for this library.
+  const halt_result = compute_halt(action);
 
-  if (action == "renew" && $("button.approve").length) {
-    console.log("HALTING FOR RENEWAL APPROVAL");
-    halt = true;
-    show_continue_processing_button = false;
-  }
-
-  if ($("#wrong-transfer-modal").length && !continue_processing) {
-    console.log("WRONG TRANSFER");
-    // Do nothing, the built in modal will reload the page when a button in it is clicked
-  } else if (
-    // Checkin uses the modal #circ-needsconfirmation-modal, checkout uses the
-    // inline alert #circ_needsconfirmation. Both wrap a "don't process" deny button.
-    ($("#circ-needsconfirmation-modal").length ||
-      $("#circ_needsconfirmation").length) &&
-    !continue_processing
-  ) {
-    console.log("NEEDS CONFIRMATION");
-    const button = $(
-      "#circ-needsconfirmation-modal button.deny, #circ_needsconfirmation button.deny"
-    );
-    button.on("click", function () {
-      continue_processing = true;
-      initiate_rfid_scanning();
-    });
-  } else if (halt && !continue_processing) {
+  if (halt_result.halt && !continue_processing) {
     console.log("HALTING FOR PROBLEM MESSAGE");
-    if (show_continue_processing_button) {
-      const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
-      dialog_alert_message.append(btn);
-      dialog_alert_message.on("click", "button.rfid-continue", function () {
-        $("button.rfid-continue").hide();
+    // Some dialogs ( e.g. needs confirmation ) wire up their own buttons
+    halt_result.customWirings.forEach(function (wire) {
+      wire();
+    });
+    // Dialogs with no buttons of their own get a "Continue processing" button
+    // the librarian can click once the issue is resolved
+    if (halt_result.showContinueButton) {
+      render_continue_button(dialog_alert_message, function () {
         continue_processing = true;
         handle_one_at_a_time(
           action,
