@@ -434,8 +434,10 @@ function handle_one_at_a_time(
   //TODO: Make this list configurable from the plugin interface
   if (
     $("#hold-found1").length ||
-    $("#hold-found2").length ||
+    $("#recalled").length ||
+    $("#recalledwaiting").length ||
     $("#item-transfer-modal").length ||
+    $("#bundle-needsconfirmation-modal").length ||
     $("#restricted_backdated").length ||
     $("#transfer-trigger").length ||
     $("#wrong-branch-modal").length ||
@@ -443,7 +445,6 @@ function handle_one_at_a_time(
     $("p.problem.ret_blocked").length ||
     $("p.problem.ret_charged").length ||
     $("p.problem.ret_datacorrupt").length ||
-    $("p.problem.ret_ispermenant").length ||
     $("p.problem.ret_refund").length ||
     $("p.problem.ret_restored").length ||
     $("p.problem.ret_withdrawn").length ||
