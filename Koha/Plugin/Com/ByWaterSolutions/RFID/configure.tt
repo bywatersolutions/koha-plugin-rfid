@@ -47,6 +47,75 @@
             </table>
         </fieldset>
 
+        <fieldset>
+            <legend>Halt behavior for optional conditions</legend>
+            <p>
+                Checked conditions halt RFID auto-processing until the librarian
+                resolves them. Unchecked conditions are ignored and the plugin
+                keeps processing. Conditions that require librarian interaction
+                ( holds, confirmations, transfers ) always halt and are not
+                listed here.
+            </p>
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Condition</th>
+                        <th>Page</th>
+                        <th>Halt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    [% FOREACH cond IN conditions %]
+                    <tr>
+                        <td>[% cond.label | html %]</td>
+                        <td>[% cond.action | html %]</td>
+                        <td>
+                            <input type="checkbox" name="halt_global" value="[% cond.key | html %]" [% IF cond.halt %]checked[% END %]>
+                        </td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </fieldset>
+
+        <fieldset>
+            <legend>Per-branch halt overrides</legend>
+            <p>
+                Optionally override the global halt behavior for individual
+                branches. "Inherit" uses the global setting above. Most libraries
+                can leave these alone.
+            </p>
+
+            [% FOREACH branch IN branches %]
+            <details>
+                <summary>[% branch.branchname | html %]</summary>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Condition</th>
+                            <th>Behavior</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH ov IN branch.overrides %]
+                        <tr>
+                            <td>[% ov.label | html %]</td>
+                            <td>
+                                <select name="halt_override_[% ov.key | html %]_[% branch.branchcode | html %]">
+                                    <option value="inherit" [% IF ov.value == 'inherit' %]selected[% END %]>Inherit ( global )</option>
+                                    <option value="halt" [% IF ov.value == 'halt' %]selected[% END %]>Halt</option>
+                                    <option value="ignore" [% IF ov.value == 'ignore' %]selected[% END %]>Ignore</option>
+                                </select>
+                            </td>
+                        </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </details>
+            [% END %]
+        </fieldset>
+
         <input type="hidden" name="save" value="1" />
 
         <input type="submit" value="Save configuration" />
