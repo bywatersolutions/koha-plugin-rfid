@@ -25,14 +25,19 @@ librarian's workstation does.
 
 | Path | Purpose |
 |------|---------|
-| `cypress.config.js` | Config + env defaults (Koha URL, emulator URL, fixtures) |
-| `support/commands.js` | `loginToKoha`, `setPad`, `resetPad`, `visitBatchCheckout`, ... |
-| `support/e2e.js` | Per-test reset of plugin localStorage + the pad |
-| `integration/smoke.cy.js` | Plugin loads and detects the running reader |
-| `integration/batch_checkout.cy.js` | Happy path + issue #9 regression |
-| `seed.pl` | Creates the deterministic test patron + items (runs inside ktd) |
-| `fixtures/seed.json` | Written by the runner from `seed.pl`'s output |
+| `cypress.config.js` | Config + env defaults; registers the `query` / `api*` tasks |
+| `plugins/db.js` | `cy.task("query")` — direct SQL ( sysprefs, item flags, fines ) |
+| `plugins/api.js` | `cy.task("apiGet"/"apiPost"/...)` — Koha REST API |
+| `support/commands.js` | `loginToKoha`, `setPad`, data builders (`ensureItem`, `ensurePatron`, `ensureBaseData`, ...) |
+| `support/halt.js` | Halt / proceed assertions, security-bit readback, halt-config injection |
+| `support/e2e.js` | Builds base data once per spec; per-test reset of plugin localStorage + the pad |
+| `integration/**` | The specs ( checkout, checkin, batch_checkout, config ) |
 | `run.sh` | Runs the whole suite once per vendor emulator |
+
+The specs build their own Koha data ( patron, items, holds, checkouts, recalls,
+sysprefs ) from the spec itself — there is no separate seed script. This mirrors
+Koha's own Cypress framework: the REST API for objects, direct SQL for state the
+API does not expose.
 
 ## Prerequisites
 
@@ -47,9 +52,10 @@ librarian's workstation does.
 ```sh
 # From the plugin repo root. Use --proxy locally so it doesn't fight other ktd
 # instances for ports 8080/8081; the staff client is then at
-# http://<name>-intra.localhost
+# http://<name>-intra.localhost. --local-db publishes MySQL to the host so the
+# specs can reach it via cy.task("query").
 SYNC_REPO=/path/to/koha \
-  ktd --proxy --name rfidtest --single-plugin "$(pwd)" up -d
+  ktd --proxy --name rfidtest --single-plugin "$(pwd)" --local-db up -d
 ktd --name rfidtest --wait-ready 300
 
 # Install AND enable the plugin, then restart so its API/static routes mount
@@ -92,11 +98,12 @@ CYPRESS_emulatorUrl=http://127.0.0.1:4039 \
   grabs `0.0.0.0`, colliding with `*` so the emulator fails to start.
 - **circit** runs on an unprivileged port during testing. The real reader uses
   port 80 under the `/Temporary_Listen_Addresses` path (which also collides with
-  the ktd Traefik proxy), so `seed.pl` sets the `RFIDCircitPort` system
-  preference to point the plugin at `CIRCIT_TEST_PORT` (default 8090) and the
-  runner starts the emulator there. The plugin's CircIT port can be overridden
-  in production too, via the `KOHA_RFID_CIRCIT_PORT` environment variable or the
-  `RFIDCircitPort` system preference.
+  the ktd Traefik proxy), so the specs set the `RFIDCircitPort` system
+  preference to point the plugin at `CIRCIT_TEST_PORT` (default 8090, passed in
+  as `CYPRESS_circitPort`) and the runner starts the emulator there. The
+  plugin's CircIT port can be overridden in production too, via the
+  `KOHA_RFID_CIRCIT_PORT` environment variable or the `RFIDCircitPort` system
+  preference.
 - The issue #9 regression test seeds the plugin's `processed_barcodes`
   localStorage and asserts the batch checkout page never reloads — reproducing
   "the screen keeps jumping" and proving the fix.

@@ -21,7 +21,28 @@ module.exports = defineConfig({
     // plugin's own XHR is allowed by the emulator's CORS headers, and our
     // helper drives the emulator over cy.request ( which is not subject to
     // same-origin ), so we don't need chromeWebSecurity disabled.
+    //
+    // Specs build their own Koha data ( instead of a separate seed script ) via
+    // these tasks: cy.task("query") for direct SQL ( sysprefs, item flags, item
+    // type checkin messages, fines ) and cy.task("apiGet"/"apiPost"/...) for the
+    // REST API ( patrons, items, biblios, holds, checkouts, recalls ).
     setupNodeEvents(on, config) {
+      const { query } = require("./plugins/db");
+      const { apiGet, apiPost, apiPut, apiDelete } = require("./plugins/api");
+
+      const baseUrl = config.baseUrl;
+      const user = config.env.apiUser || config.env.kohaUser;
+      const pass = config.env.apiPass || config.env.kohaPass;
+      const withAuth = fn => args => fn({ ...args, baseUrl, user, pass });
+
+      on("task", {
+        query,
+        apiGet: withAuth(apiGet),
+        apiPost: withAuth(apiPost),
+        apiPut: withAuth(apiPut),
+        apiDelete: withAuth(apiDelete),
+      });
+
       return config;
     },
   },
@@ -34,7 +55,12 @@ module.exports = defineConfig({
     // The runner sets this per vendor; mksolutions is the default.
     emulatorUrl: "http://127.0.0.1:4039",
 
-    // Deterministic fixtures created by t/cypress/seed.pl
+    // The port the circit emulator runs on during testing ( the real reader
+    // uses privileged port 80 ). The runner sets this per vendor; specs write
+    // it to the RFIDCircitPort syspref so the plugin probes the emulator.
+    circitPort: "8090",
+
+    // Identifiers for the deterministic test patron and items the specs build.
     patronCardnumber: "RFIDTESTPATRON",
     itemBarcodes: ["RFIDTEST001", "RFIDTEST002", "RFIDTEST003"],
   },

@@ -4,6 +4,3 @@
 t/cypress/screenshots/
 t/cypress/videos/
 t/cypress/downloads/
-
-# Generated at run time by t/cypress/run.sh from seed.pl
-t/cypress/fixtures/seed.json

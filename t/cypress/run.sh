@@ -37,9 +37,9 @@ VENDORS="${VENDORS:-mksolutions bibliotheca circit}"
 
 # Port the circit emulator + plugin use during testing. The real reader uses
 # privileged port 80 ( which also collides with the ktd Traefik proxy ), so the
-# suite runs the emulator on this port and passes it to seed.pl, which points
-# the plugin at it via the RFIDCircitPort system preference. This is the single
-# source of truth for the circit test port.
+# suite runs the emulator on this port and passes it to the specs ( as
+# CYPRESS_circitPort ), which point the plugin at it via the RFIDCircitPort
+# system preference. This is the single source of truth for the circit test port.
 CIRCIT_TEST_PORT="${CIRCIT_TEST_PORT:-8090}"
 
 # Resolve the plugin repo root ( two levels up from this script )
@@ -49,8 +49,8 @@ PLUGIN_NAME="$(basename "$PLUGIN_DIR")"
 KTD="$KTD_HOME/bin/ktd"
 
 # Per-vendor emulator script. circit normally uses privileged port 80; the
-# suite runs it on CIRCIT_TEST_PORT instead ( see seed.pl, which points the
-# plugin at that port via the RFIDCircitPort system preference ).
+# suite runs it on CIRCIT_TEST_PORT instead ( the specs point the plugin at that
+# port via the RFIDCircitPort system preference ).
 emulator_script() {
     case "$1" in
         mksolutions) echo "mksolutions_emulator.pl" ;;
@@ -79,16 +79,16 @@ stop_emulator() {
 trap stop_emulator EXIT
 
 # Seed deterministic test data ( patron + items ) and capture the fixture.
-echo ">> Seeding test data in ktd instance '$KTD_NAME'"
-mkdir -p "$SCRIPT_DIR/fixtures"
-SEED_JSON="$("$KTD" --name "$KTD_NAME" --shell --run \
-    "perl /kohadevbox/plugins/$PLUGIN_NAME/t/cypress/seed.pl $CIRCIT_TEST_PORT" 2>/dev/null | tail -1)"
-if ! echo "$SEED_JSON" | grep -q borrowernumber; then
-    echo "!! Seeding failed; got: $SEED_JSON" >&2
-    exit 1
-fi
-echo "$SEED_JSON" > "$SCRIPT_DIR/fixtures/seed.json"
-echo "   seed.json: $SEED_JSON"
+# The specs build their own Koha data ( see t/cypress/support ), so there is no
+# separate seed step. Setup reaches the database directly via cy.task("query"),
+# so the ktd instance must expose MySQL to the host -- bring it up with
+# --local-db. Defaults below match such an instance; override for other setups.
+echo ">> Test data is built by the specs ( no seed step )"
+export DB_HOSTNAME="${DB_HOSTNAME:-127.0.0.1}"
+export DB_PORT="${DB_PORT:-3306}"
+export DB_USER="${DB_USER:-koha_kohadev}"
+export DB_PASSWORD="${DB_PASSWORD:-password}"
+export DB_NAME="${DB_NAME:-koha_kohadev}"
 
 OVERALL_RC=0
 for vendor in $VENDORS; do
@@ -127,6 +127,7 @@ for vendor in $VENDORS; do
     fi
 
     if ! CYPRESS_baseUrl="$BASE_URL" CYPRESS_emulatorUrl="$url" \
+        CYPRESS_circitPort="$CIRCIT_TEST_PORT" \
         npx cypress run --project "$SCRIPT_DIR"; then
         echo "!! Suite FAILED for vendor $vendor" >&2
         OVERALL_RC=1

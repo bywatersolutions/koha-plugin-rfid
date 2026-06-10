@@ -1,4 +1,12 @@
 import "./commands";
+import "./halt";
+import "./scenarios";
+
+// Build the base data ( sysprefs, test patron, default items ) once per spec
+// file. Individual specs build their own scenario data on top of this.
+before(() => {
+  cy.ensureBaseData();
+});
 
 // The plugin stores quite a bit of state in localStorage ( the detected
 // vendor, the previous action, and the unprocessed / processed barcode
