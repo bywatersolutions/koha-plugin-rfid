@@ -90,7 +90,14 @@ export DB_USER="${DB_USER:-koha_kohadev}"
 export DB_PASSWORD="${DB_PASSWORD:-password}"
 export DB_NAME="${DB_NAME:-koha_kohadev}"
 
+# Most of the suite is pure DOM-probing halt logic that behaves identically for
+# every vendor, so it runs once ( on the first vendor ). Only the genuinely
+# vendor-specific specs -- reader detection and the security-bit round-trip --
+# re-run for each subsequent vendor.
+PER_VENDOR_SPECS="$SCRIPT_DIR/integration/smoke.cy.js,$SCRIPT_DIR/integration/checkout/plain_checkout.cy.js,$SCRIPT_DIR/integration/checkin/plain_checkin.cy.js"
+
 OVERALL_RC=0
+first_vendor=1
 for vendor in $VENDORS; do
     script="$(emulator_script "$vendor")"
     port="$(emulator_port "$vendor")"
@@ -126,14 +133,23 @@ for vendor in $VENDORS; do
         continue
     fi
 
+    if [ "$first_vendor" -eq 1 ]; then
+        echo "   ( running the full suite )"
+        run_specs=""
+    else
+        echo "   ( running the vendor-specific subset )"
+        run_specs="--spec $PER_VENDOR_SPECS"
+    fi
+
     if ! CYPRESS_baseUrl="$BASE_URL" CYPRESS_emulatorUrl="$url" \
         CYPRESS_circitPort="$CIRCIT_TEST_PORT" \
-        npx cypress run --project "$SCRIPT_DIR"; then
+        npx cypress run --project "$SCRIPT_DIR" $run_specs; then
         echo "!! Suite FAILED for vendor $vendor" >&2
         OVERALL_RC=1
     fi
 
     stop_emulator
+    first_vendor=0
 done
 
 exit "$OVERALL_RC"
