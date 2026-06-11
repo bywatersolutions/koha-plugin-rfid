@@ -50,7 +50,9 @@ jobs:
           export KTD_HOME="$GITHUB_WORKSPACE/ktd"
           export SYNC_REPO="$GITHUB_WORKSPACE/kohaclone"
           export KOHA_IMAGE=main
-          ktd --name rfid --single-plugin "$GITHUB_WORKSPACE/plugin" up -d
+          # --local-db publishes MySQL to the runner host so the Cypress specs
+          # can build their data via cy.task("query").
+          ktd --name rfid --single-plugin "$GITHUB_WORKSPACE/plugin" --local-db up -d
           ktd --name rfid --wait-ready 500
 
       - name: Install and enable the plugin
