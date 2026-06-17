@@ -91,14 +91,14 @@ const rfidVendor = {
           return { items: [] };  // Return empty items on error
         });
       },
-      setSecurityBit: function (barcode, bitValue) {
+      setSecurityBit: function (item, bitValue) {
         return $.ajax({
           url: `${this.baseUrl}/setSecurity`,
           dataType: "xml",
           contentType: "text/xml",
           async: false,
           method: "PUT",
-          data: `<rfid><barcode>${barcode}</barcode><is_secure>${bitValue}</is_secure></rfid>`
+          data: `<rfid><barcode>${item.barcode}</barcode><is_secure>${bitValue}</is_secure></rfid>`
         });
       }
     },
@@ -146,12 +146,14 @@ const rfidVendor = {
             console.log("Processing item:", item);
             const barcode = item.Id;
             console.log("Barcode:", barcode);
-            const isSecure = item.IsSecured ? true : false;
+			      //Bibliotheca returns 0 for secured and 2 for not secure
+            const isSecure = item.IsSecured ? false : true;
             console.log("Is secure:", isSecure);
-
+            const tagId = item.Tags[0].Id;
             result.items.push({
               barcode: barcode,
               security: isSecure
+			        tagId: tagId
             });
           }
 
@@ -166,7 +168,7 @@ const rfidVendor = {
           return { items: [] };  // Return empty items on error
         });
       },
-      setSecurityBit: function (barcode, bitValue) {
+      setSecurityBit: function (item, bitValue) {
         return $.ajax({
           url: `${this.baseUrl}/SetTagSecurity`,
           dataType: "json",
@@ -174,7 +176,7 @@ const rfidVendor = {
           async: false,
           method: "POST",
           data: JSON.stringify({
-            tagId: barcode,
+            tagId: item.tagId,
             isSecured: bitValue ? true : false
           })
         });
@@ -208,9 +210,9 @@ const rfidVendor = {
       getItems: function () {
         return $.getJSON(`${this.baseUrl}/getitems`);
       },
-      setSecurityBit: function (barcode, bitValue) {
+      setSecurityBit: function (item, bitValue) {
         return $.ajax({
-          url: `${this.baseUrl}/setsecurity/${barcode}/${bitValue}`,
+          url: `${this.baseUrl}/setsecurity/${item.barcode}/${bitValue}`,
           dataType: "json",
           async: false
         });
@@ -298,11 +300,11 @@ const rfidVendor = {
     return this.currentVendor.getItems();
   },
 
-  setSecurityBit: function (barcode, bitValue) {
+  setSecurityBit: function (item, bitValue) {
     if (!this.currentVendor) {
       return $.Deferred().reject('No RFID reader available').promise();
     }
-    return this.currentVendor.setSecurityBit(barcode, bitValue);
+    return this.currentVendor.setSecurityBit(item, bitValue);
   }
 };
 
@@ -601,13 +603,13 @@ function handle_one_at_a_time(
     let unprocessed_barcodes = get_unprocessed_barcodes();
 
     if (unprocessed_barcodes.length) {
-      const barcode = unprocessed_barcodes.pop();
+      const item = unprocessed_barcodes.pop();
 
       set_unprocessed_barcodes(unprocessed_barcodes);
-      add_processed_barcode(barcode);
+      add_processed_barcode(item);
 
       set_security_and_submit_single_barcode(
-        barcode,
+        item,
         action,
         security_setting,
         barcode_input,
@@ -622,7 +624,7 @@ function handle_one_at_a_time(
         console.log("UNPROCESSED BARCODES: ", unprocessed_barcodes);
 
         let rfid_pad_barcodes = data.items.map(function (item) {
-          return item.barcode;
+          return item;
         });
         console.log("NEW BARCODES: ", rfid_pad_barcodes);
 
@@ -635,13 +637,13 @@ function handle_one_at_a_time(
         );
         console.log("COMBINED BARCODES: ", combined_barcodes);
 
-        const barcode = combined_barcodes.pop();
-        if (barcode) {
+        const item = combined_barcodes.pop();
+        if (item) {
           set_unprocessed_barcodes(combined_barcodes);
-          add_processed_barcode(barcode);
+          add_processed_barcode(item);
 
           set_security_and_submit_single_barcode(
-            barcode,
+            item,
             action,
             security_setting,
             barcode_input,
@@ -659,19 +661,19 @@ function handle_one_at_a_time(
 }
 
 function set_security_and_submit_single_barcode(
-  barcode,
+  item,
   action,
   security_setting,
   barcode_input,
   form_submit,
   submit_form_automatically
 ) {
-  barcode_input.val(barcode);
+  barcode_input.val(item.barcode);
   if (security_setting == "enable" || security_setting == "disable") {
     const security_flag_value = security_setting == "enable" ? true : false;
 
     console.log("ALTERING SECURITY BITS");
-    const r = alter_security_bits([barcode], security_flag_value).then(
+    const r = alter_security_bits([item], security_flag_value).then(
       function () {
         console.log("ALTERING SECURITY BITS COMPLETED");
         form_submit.click();
@@ -863,14 +865,14 @@ function set_processed_barcodes(barcodes) {
   );
 }
 
-function add_processed_barcode(barcode) {
-  let barcodes = get_processed_barcodes();
+function add_processed_barcode(item) {
+  let items = get_processed_barcodes();
 
-  if (barcodes.includes(barcode)) {
+  if (includesItem(items, item)) {
     return false;
   } else {
-    barcodes.push(barcode);
-    set_processed_barcodes(barcodes);
+    items.push(item);
+    set_processed_barcodes(items);
     return true;
   }
 }
@@ -897,12 +899,12 @@ function handle_one_and_done(
 
   if (barcode_input.length) {
     poll_rfid_for_barcodes_batch(function (data) {
-      let barcodes = data.items.map(function (item) {
-        return item.barcode;
+	  let items = data.items.map(function (item) {
+        return item;
       });
-      console.log("BARCODES: ", barcodes);
+      console.log("Items: ", items);
 
-      if (barcodes.length > 1) {
+      if (items.length > 1) {
         alert(
           "More than one RFID tag is on the reader. Please remove all but one RFID tag and click 'OK'"
         );
@@ -914,7 +916,7 @@ function handle_one_and_done(
           auto_submit_test_cb
         );
       } else {
-        barcode_input.val(barcodes[0]);
+        barcode_input.val(items[0]);
 
         const submit_form_automatically = auto_submit_test_cb
           ? auto_submit_test_cb(
@@ -928,7 +930,7 @@ function handle_one_and_done(
         if (security_setting == "enable" || security_setting == "disable") {
           const security_flag_value =
             security_setting == "enable" ? true : false;
-          const r = alter_security_bits(barcodes, security_flag_value).then(
+          const r = alter_security_bits(items, security_flag_value).then(
             function () {
               if (submit_form_automatically) {
                 form_submit.click();
@@ -947,26 +949,21 @@ function handle_one_and_done(
 }
 
 function combine_barcodes(
-  rfid_pad_barcodes,
-  unprocessed_barcodes,
-  processed_barcodes
+  rfid_pad_items,
+  unprocessed_items,
+  processed_items
 ) {
   console.log("combine_barcodes");
-  // Add the barcodes on the rfid pad to the currently uprocessed barcode
-  let combined_barcodes = unprocessed_barcodes.concat(
-    rfid_pad_barcodes.filter(item => unprocessed_barcodes.indexOf(item) < 0)
-  );
-  console.log(
-    "COMBINED UNPROCESSED AND RFID PAD BARCODES: ",
-    combined_barcodes
-  );
-  // Then remove out any barcodes we have already seen
-  combined_barcodes = combined_barcodes.filter(
-    el => !processed_barcodes.includes(el)
-  );
-  console.log("COMBINED BARCODES WITH PROCESSED BARCODES REMOVED");
-
-  return combined_barcodes;
+  // Add the barcodes on the rfid pad to the currently unprocessed barcode
+  let combined_items = unprocessed_items;
+  
+  rfid_pad_items.forEach((item) => {
+	  if(!includesItem(unprocessed_items,item) && !includesItem(processed_items,item)){
+		  combined_items.push(item);
+	  }
+	});
+  console.log("COMBINED BARCODES: ", combined_items);
+  return combined_items;
 }
 
 function handle_batch(
@@ -984,8 +981,8 @@ function handle_batch(
 
   if (barcodes_textarea.length) {
     poll_rfid_for_barcodes_batch(function (data) {
-      let barcodes = data.items.map(function (item) {
-        return item.barcode;
+	  let items = data.items.map(function (item) {
+        return item;
       });
 
       if (!form_submit) {
@@ -994,9 +991,9 @@ function handle_batch(
 
       // The function add_processed_barcode will return false if the barcode has already been added to the processed list
       let unseen_barcodes = [];
-      for (const b of barcodes) {
-        if (add_processed_barcode(b)) {
-          unseen_barcodes.push(b);
+      for (const item of items) {
+        if (add_processed_barcode(item)) {
+          unseen_barcodes.push(item);
         }
       }
 
@@ -1032,7 +1029,7 @@ function handle_batch(
 
       if (security_setting == "enable" || security_setting == "disable") {
         const security_flag_value = security_setting == "enable" ? true : false;
-        const r = alter_security_bits(barcodes, security_flag_value).then(
+        const r = alter_security_bits(items, security_flag_value).then(
           function () {
             if (submit_form_automatically) {
               form_submit.click();
@@ -1067,9 +1064,9 @@ function handle_batch(
   }
 }
 
-let alter_security_bits = async (barcodes, bit_value) => {
-  console.log("alter_security_bits", barcodes, bit_value);
-  barcodes.forEach(each => {
+let alter_security_bits = async (items, bit_value) => {
+  console.log("alter_security_bits", items, bit_value);
+  items.forEach(each => {
     rfidVendor.setSecurityBit(each, bit_value).done(function (data) {
       console.log("setsecurity RETURNED", data);
       return data;
@@ -1433,12 +1430,12 @@ function updateBarcodeList() {
 
   const html = `
         <div class="list-group" style="max-height: 350px; overflow-y: auto;">
-            ${barcodes.map(barcode => `
+            ${barcodes.map(item => `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <span class="font-monospace">${barcode}</span>
+                    <span class="font-monospace">${item.barcode}</span>
                     <div>
-                        <button class="btn btn-sm btn-outline-success process-barcode" data-barcode="${barcode}" title="Mark as processed">✓</button>
-                        <button class="btn btn-sm btn-outline-danger remove-barcode" data-barcode="${barcode}" title="Remove">×</button>
+                        <button class="btn btn-sm btn-outline-success process-barcode" data-barcode="${item.barcode}" title="Mark as processed">✓</button>
+                        <button class="btn btn-sm btn-outline-danger remove-barcode" data-barcode="${item.barcode}" title="Remove">×</button>
                     </div>
                 </div>
             `).join('')}
@@ -1488,9 +1485,9 @@ function updateProcessedBarcodeList() {
 
   const html = `
         <div class="list-group" style="max-height: 350px; overflow-y: auto;">
-            ${reversedBarcodes.map(barcode => `
+            ${reversedBarcodes.map(item => `
                 <div class="list-group-item d-flex justify-content-between align-items-center">
-                    <span class="font-monospace">${barcode}</span>
+                    <span class="font-monospace">${item.barcode}</span>
                     <span class="badge bg-success">Processed</span>
                 </div>
             `).join('')}
