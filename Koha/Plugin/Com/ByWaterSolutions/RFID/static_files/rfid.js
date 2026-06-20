@@ -876,6 +876,9 @@ function add_processed_barcode(item) {
     return true;
   }
 }
+function includesItem(itemsArray, itemObj){
+	return itemsArray.some((itemVal) => itemObj.barcode === itemVal.barcode);
+}
 
 function display_rfid_failure() {
   console.log("NO RFID READER FOUND");
