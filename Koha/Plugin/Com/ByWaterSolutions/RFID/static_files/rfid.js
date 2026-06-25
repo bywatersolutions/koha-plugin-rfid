@@ -1117,7 +1117,7 @@ function initFloatingResetButton() {
 
   // Create the floating reset button
   const $reset_box = $(`
-        <div id="rfid-reset-box" style="
+        <div class="noprint" id="rfid-reset-box" style="
             position: fixed;
             bottom: 20px;  
             right: 20px;  
