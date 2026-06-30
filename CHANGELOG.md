@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-30
+
 ### Added
 
 - Optional checkin/checkout halt conditions are now configurable per library. Each informational condition can be set to halt RFID auto-processing or be ignored, with a global default and an optional per-branch override. Conditions that require librarian interaction (holds, confirmations, transfers) always halt and are not configurable.

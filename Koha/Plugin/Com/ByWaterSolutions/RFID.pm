@@ -9,7 +9,7 @@ use Koha::Libraries;
 
 use base qw(Koha::Plugins::Base);
 
-our $VERSION         = "0.7.2";
+our $VERSION         = "0.8.0";
 our $MINIMUM_VERSION = "{MINIMUM_VERSION}";
 
 # Optional halt conditions a library can choose to halt on or ignore. The keys
