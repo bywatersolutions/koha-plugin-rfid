@@ -146,14 +146,17 @@ const rfidVendor = {
             console.log("Processing item:", item);
             const barcode = item.Id;
             console.log("Barcode:", barcode);
-			      //Bibliotheca returns 0 for secured and 2 for not secure
+            // Bibliotheca returns 0 for secured and 2 for not secure
             const isSecure = item.IsSecured ? false : true;
             console.log("Is secure:", isSecure);
-            const tagId = item.Tags[0].Id;
+            // Bibliotheca flips the security bit by tag id ( serial number ),
+            // not barcode. Guard against an item with no tags so one malformed
+            // item doesn't throw and wipe out the whole batch.
+            const tagId = item.Tags && item.Tags[0] ? item.Tags[0].Id : null;
             result.items.push({
               barcode: barcode,
-              security: isSecure
-			        tagId: tagId
+              security: isSecure,
+              tagId: tagId
             });
           }
 
@@ -876,8 +879,8 @@ function add_processed_barcode(item) {
     return true;
   }
 }
-function includesItem(itemsArray, itemObj){
-	return itemsArray.some((itemVal) => itemObj.barcode === itemVal.barcode);
+function includesItem(itemsArray, itemObj) {
+  return itemsArray.some(itemVal => itemObj.barcode === itemVal.barcode);
 }
 
 function display_rfid_failure() {
@@ -902,7 +905,7 @@ function handle_one_and_done(
 
   if (barcode_input.length) {
     poll_rfid_for_barcodes_batch(function (data) {
-	  let items = data.items.map(function (item) {
+      let items = data.items.map(function (item) {
         return item;
       });
       console.log("Items: ", items);
@@ -919,7 +922,7 @@ function handle_one_and_done(
           auto_submit_test_cb
         );
       } else {
-        barcode_input.val(items[0]);
+        barcode_input.val(items[0].barcode);
 
         const submit_form_automatically = auto_submit_test_cb
           ? auto_submit_test_cb(
@@ -957,14 +960,18 @@ function combine_barcodes(
   processed_items
 ) {
   console.log("combine_barcodes");
-  // Add the barcodes on the rfid pad to the currently unprocessed barcode
-  let combined_items = unprocessed_items;
-  
-  rfid_pad_items.forEach((item) => {
-	  if(!includesItem(unprocessed_items,item) && !includesItem(processed_items,item)){
-		  combined_items.push(item);
-	  }
-	});
+  // Add the barcodes on the rfid pad to the currently unprocessed barcodes,
+  // skipping any we already have queued or have already processed.
+  let combined_items = [...unprocessed_items];
+
+  rfid_pad_items.forEach(item => {
+    if (
+      !includesItem(combined_items, item) &&
+      !includesItem(processed_items, item)
+    ) {
+      combined_items.push(item);
+    }
+  });
   console.log("COMBINED BARCODES: ", combined_items);
   return combined_items;
 }
@@ -984,7 +991,7 @@ function handle_batch(
 
   if (barcodes_textarea.length) {
     poll_rfid_for_barcodes_batch(function (data) {
-	  let items = data.items.map(function (item) {
+      let items = data.items.map(function (item) {
         return item;
       });
 
@@ -1018,7 +1025,9 @@ function handle_batch(
       }
 
       barcodes_textarea.val(
-        barcodes_textarea.val() + unseen_barcodes.join("\r\n") + "\r\n"
+        barcodes_textarea.val() +
+          unseen_barcodes.map(item => item.barcode).join("\r\n") +
+          "\r\n"
       );
 
       const submit_form_automatically = auto_submit_test_cb
@@ -1452,7 +1461,9 @@ function updateBarcodeList() {
     e.stopPropagation();
     const barcodeToRemove = $(this).data('barcode');
     const currentBarcodes = get_unprocessed_barcodes();
-    const updatedBarcodes = currentBarcodes.filter(b => b !== barcodeToRemove);
+    const updatedBarcodes = currentBarcodes.filter(
+      b => String(b.barcode) !== String(barcodeToRemove)
+    );
     set_unprocessed_barcodes(updatedBarcodes);
     updateBarcodeList();
   });
@@ -1462,9 +1473,16 @@ function updateBarcodeList() {
     e.stopPropagation();
     const barcodeToProcess = $(this).data('barcode');
     const currentUnprocessed = get_unprocessed_barcodes();
-    const updatedUnprocessed = currentUnprocessed.filter(b => b !== barcodeToProcess);
+    const itemToProcess = currentUnprocessed.find(
+      b => String(b.barcode) === String(barcodeToProcess)
+    );
+    const updatedUnprocessed = currentUnprocessed.filter(
+      b => String(b.barcode) !== String(barcodeToProcess)
+    );
     set_unprocessed_barcodes(updatedUnprocessed);
-    add_processed_barcode(barcodeToProcess);
+    if (itemToProcess) {
+      add_processed_barcode(itemToProcess);
+    }
     updateBarcodeList();
     updateProcessedBarcodeList();
   });
