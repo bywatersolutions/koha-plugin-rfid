@@ -40,9 +40,11 @@ describe("RFID batch checkout", () => {
 
     cy.visitBatchCheckout({
       onBeforeLoad(win) {
+        // The plugin tracks whole item objects ( keyed on barcode ), not bare
+        // barcode strings, so seed the processed list in that shape.
         win.localStorage.setItem(
           "koha_plugin_rfid_processed_barcodes",
-          JSON.stringify(barcodes)
+          JSON.stringify(barcodes.map(barcode => ({ barcode })))
         );
         // Same action as last time, so the plugin keeps its memory
         // instead of clearing it on an action change.
