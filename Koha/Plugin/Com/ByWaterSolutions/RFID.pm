@@ -9,8 +9,8 @@ use Koha::Libraries;
 
 use base qw(Koha::Plugins::Base);
 
-our $VERSION         = "0.8.0";
-our $MINIMUM_VERSION = "{MINIMUM_VERSION}";
+our $VERSION         = "0.9.0";
+our $MINIMUM_VERSION = "25.11";
 
 # Optional halt conditions a library can choose to halt on or ignore. The keys
 # must stay in sync with the optional entries of RFID_CONDITIONS in
