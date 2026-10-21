@@ -1089,35 +1089,48 @@ let alter_security_bits = async (items, bit_value) => {
   });
 };
 
-function poll_rfid_for_barcodes_batch(cb, no_wait) {
-  console.log("poll_rfid_for_barcodes_batch", cb);
-  let items_count = 0;
+function poll_rfid_for_barcodes_batch(cb, no_wait = false) {
+    console.log("poll_rfid_for_barcodes_batch", cb);
 
-  intervalID = setInterval(function () {
-    rfidVendor.getItems().then(function (data) {
-      console.log(data);
-      if (data.items && data.items.length) {
-        // We have at least one item on the pad
-        if (items_count > 0) {
-          // RFID Service provides debouncing of items on antenna, no need to
-          // do that here as it adds additional delays in reporting item IDs
-          clearInterval(intervalID);
-          console.log(
-            "ITEMS HAVE SETTLED, FINISHED WAITING, INITIATING CALLBACK"
-          );
-          cb(data);
-        } else {
-          items_count = data.items.length;
-        }
-      } else if (data && data.items && data.items.length && no_wait) {
-        clearInterval(intervalID);
-        console.log("NO WAIT ENABLED, INTIATED CALLBACK");
-        cb(data);
-      }
-    });
-  }, 500);
-  console.log("INTERVAL ID:", intervalID);
-  return intervalID;
+    let items_count = 0;
+    let polling = false;
+
+    intervalID = setInterval(function () {
+        if (polling) return;
+
+        polling = true;
+
+        rfidVendor.getItems()
+            .then(function (data) {
+                if (!data || !data.items || !data.items.length) {
+                    items_count = 0;
+                    return;
+                }
+
+                if (no_wait || items_count > 0) {
+                    clearInterval(intervalID);
+                    if (intervalID === pollIntervalID) {
+                        intervalID = null;
+                    }
+
+                    console.log(
+                        "RFID ITEMS READY, INITIATING CALLBACK"
+                    );
+
+                    cb(data);
+                } else {
+                    items_count = data.items.length;
+                }
+            })
+            .fail(function (error) {
+                console.error("RFID polling failed:", error);
+            })
+            .always(function () {
+                polling = false;
+            });
+    }, 250);
+
+    intervalID = pollIntervalID;
 }
 
 // Create and initialize the floating box UI
