@@ -1095,12 +1095,15 @@ function poll_rfid_for_barcodes_batch(cb, no_wait = false) {
     let items_count = 0;
     let polling = false;
 
-    intervalID = setInterval(function () {
+    const pollIntervalID = setInterval(function () {
         if (polling) return;
 
         polling = true;
 
-        rfidVendor.getItems()
+        Promise.resolve()
+            .then(function () {
+                return rfidVendor.getItems();
+            })
             .then(function (data) {
                 if (!data || !data.items || !data.items.length) {
                     items_count = 0;
@@ -1108,29 +1111,28 @@ function poll_rfid_for_barcodes_batch(cb, no_wait = false) {
                 }
 
                 if (no_wait || items_count > 0) {
-                    clearInterval(intervalID);
+                    clearInterval(pollIntervalID);
+
                     if (intervalID === pollIntervalID) {
                         intervalID = null;
                     }
 
-                    console.log(
-                        "RFID ITEMS READY, INITIATING CALLBACK"
-                    );
-
+                    console.log("RFID ITEMS READY, INITIATING CALLBACK");
                     cb(data);
                 } else {
                     items_count = data.items.length;
                 }
             })
-            .fail(function (error) {
+            .catch(function (error) {
                 console.error("RFID polling failed:", error);
             })
-            .always(function () {
+            .finally(function () {
                 polling = false;
             });
     }, 250);
 
     intervalID = pollIntervalID;
+    return pollIntervalID;
 }
 
 // Create and initialize the floating box UI
