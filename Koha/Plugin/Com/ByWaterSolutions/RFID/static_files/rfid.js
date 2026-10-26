@@ -493,7 +493,7 @@ function startRfidFunctionality() {
     // Renewal option on the top bar
     $("#renew_search-tab,a[href='#renew_search']").on("click", function () {
       handle_action_change("renew");
-      handle_one_at_a_time("checkin", "enable", $("#ren_barcode"));
+      handle_one_at_a_time("renew", "disable", $("#ren_barcode"));
     });
 
     // Catalog search on the top bar
