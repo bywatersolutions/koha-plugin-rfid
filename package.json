@@ -1,6 +1,6 @@
 {
   "name": "koha-plugin-rfid",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Koha RFID Plugin",
   "devDependencies": {
     "cypress": "^13.15.0",
