@@ -826,16 +826,19 @@ function get_current_action() {
   }
 }
 
+// The previous action and barcode lists live in sessionStorage so each tab has its own.
+// In localStorage they were shared with every Koha tab and slip popup, and any of those
+// resetting its state wiped this tab's processed list, so items still on the pad were processed again.
 function set_previous_action(action) {
-  localStorage.setItem("koha_plugin_rfid_previous_action", action);
+  sessionStorage.setItem("koha_plugin_rfid_previous_action", action);
 }
 
 function get_previous_action() {
-  return localStorage.getItem("koha_plugin_rfid_previous_action");
+  return sessionStorage.getItem("koha_plugin_rfid_previous_action");
 }
 
 function set_unprocessed_barcodes(barcodes) {
-  return localStorage.setItem(
+  return sessionStorage.setItem(
     "koha_plugin_rfid_unprocessed_barcodes",
     JSON.stringify(barcodes)
   );
@@ -843,7 +846,7 @@ function set_unprocessed_barcodes(barcodes) {
 
 function get_unprocessed_barcodes() {
   console.log("get_unprocessed_barcodes");
-  const barcodes_json = localStorage.getItem(
+  const barcodes_json = sessionStorage.getItem(
     "koha_plugin_rfid_unprocessed_barcodes"
   );
   console.log("UNPROCESSED BARCODES JSON: ", barcodes_json);
@@ -853,7 +856,7 @@ function get_unprocessed_barcodes() {
 
 function get_processed_barcodes() {
   console.log("get_processed_barcodes");
-  const barcodes_json = localStorage.getItem(
+  const barcodes_json = sessionStorage.getItem(
     "koha_plugin_rfid_processed_barcodes"
   );
   console.log("PROCESSED BARCODES JSON: ", barcodes_json);
@@ -862,7 +865,7 @@ function get_processed_barcodes() {
 }
 
 function set_processed_barcodes(barcodes) {
-  return localStorage.setItem(
+  return sessionStorage.setItem(
     "koha_plugin_rfid_processed_barcodes",
     JSON.stringify(barcodes)
   );

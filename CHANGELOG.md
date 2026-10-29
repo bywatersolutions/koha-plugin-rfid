@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Items left on the RFID pad are no longer checked in or checked out a second time when a slip prints or another Koha tab or window is opened. This caused the hold prompt to appear twice at checkin and an unexpected renewal prompt at checkout.
+
 ## [0.8.0] - 2026-06-30
 
 ### Added

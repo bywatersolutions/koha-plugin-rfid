@@ -14,11 +14,15 @@
 const RFID_LOCALSTORAGE_KEYS = [
   "koha_plugin_rfid_enabled",
   "koha_plugin_rfid_vendor",
+  "koha_plugin_rfid_show_reset_box",
+  "koha_plugin_rfid_show_barcode_box",
+];
+
+// Per-tab state, kept in sessionStorage so other tabs and slip popups can't reset it
+const RFID_SESSIONSTORAGE_KEYS = [
   "koha_plugin_rfid_previous_action",
   "koha_plugin_rfid_unprocessed_barcodes",
   "koha_plugin_rfid_processed_barcodes",
-  "koha_plugin_rfid_show_reset_box",
-  "koha_plugin_rfid_show_barcode_box",
 ];
 
 const marcxmlFor = title =>
@@ -30,10 +34,11 @@ const marcxmlFor = title =>
 
 // --- RFID plugin / emulator helpers ---
 
-// Wipe the plugin's localStorage so each test starts from a known state.
-Cypress.Commands.add("clearRfidLocalStorage", () => {
+// Wipe the plugin's localStorage and sessionStorage so each test starts from a known state.
+Cypress.Commands.add("clearRfidStorage", () => {
   cy.window({ log: false }).then(win => {
     RFID_LOCALSTORAGE_KEYS.forEach(key => win.localStorage.removeItem(key));
+    RFID_SESSIONSTORAGE_KEYS.forEach(key => win.sessionStorage.removeItem(key));
   });
 });
 
