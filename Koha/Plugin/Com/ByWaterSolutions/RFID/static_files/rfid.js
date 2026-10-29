@@ -342,7 +342,8 @@ const RFID_CONDITIONS = [
       const button = $(
         "#circ-needsconfirmation-modal button.deny, #circ_needsconfirmation button.deny"
       );
-      button.on("click", function () {
+      // Namespaced so wiring again when the tab becomes visible doesn't stack handlers
+      button.off("click.rfid").on("click.rfid", function () {
         continue_processing = true;
         initiate_rfid_scanning();
       });
@@ -451,6 +452,9 @@ function compute_halt(action) {
 // Append a "Continue processing RFID tags" button to a dialog and run the
 // given callback when the librarian clicks it.
 function render_continue_button(container, onContinue) {
+  // Halt checks run again each time the tab becomes visible, only add the button once
+  if (container.find("button.rfid-continue").length) return;
+
   const btn = `<button class="rfid-continue">Continue processing RFID tags</button>`;
   container.append(btn);
   container.on("click", "button.rfid-continue", function () {
