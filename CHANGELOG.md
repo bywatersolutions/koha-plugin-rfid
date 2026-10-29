@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-29
+
 ### Added
 
 - A warning appears at the top of the page when RFID is active in more than one visible Koha window, for example two windows side by side. Both windows would process the items placed on the RFID pad, so close or minimize one of them.
