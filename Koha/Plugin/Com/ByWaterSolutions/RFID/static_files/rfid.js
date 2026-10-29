@@ -478,6 +478,9 @@ $(document).ready(async function () {
   // Always show the RFID Controls box (it contains the on/off toggle)
   initFloatingResetButton();
 
+  // Started even while RFID is disabled, so turning it on later is picked up by the other windows
+  start_rfid_window_presence();
+
   // If RFID is disabled, stop here
   if (!isRfidEnabled()) return;
 
@@ -562,6 +565,86 @@ function handle_visibility() {
   }
 }
 document.addEventListener("visibilitychange", handle_visibility);
+
+// Hidden tabs leave the pad alone, but every visible window with RFID active processes the
+// items placed on it, e.g. two Koha windows side by side. Windows tell each other whether they
+// are active over a BroadcastChannel so we can warn the librarian.
+const RFID_WINDOW_CHANNEL = "koha_plugin_rfid_windows";
+const rfid_window_id = Math.random().toString(36).slice(2);
+const other_rfid_windows = {};
+let rfid_window_channel = null;
+
+function is_rfid_window_active() {
+  return isRfidEnabled() && !document.hidden && !!get_current_action();
+}
+
+function announce_rfid_window(type) {
+  rfid_window_channel.postMessage({
+    type: type || "heartbeat",
+    id: rfid_window_id,
+    active: is_rfid_window_active(),
+  });
+}
+
+function update_multiple_windows_warning() {
+  const now = Date.now();
+  let other_window_active = false;
+
+  for (const [id, other_window] of Object.entries(other_rfid_windows)) {
+    // A window that stopped sending heartbeats was closed or crashed
+    if (now - other_window.last_seen > 5000) {
+      delete other_rfid_windows[id];
+    } else if (other_window.active) {
+      other_window_active = true;
+    }
+  }
+
+  if (other_window_active && is_rfid_window_active()) {
+    initMultipleWindowsWarning().show();
+  } else {
+    $("#rfid-multiple-windows-warning").hide();
+  }
+}
+
+function start_rfid_window_presence() {
+  if (rfid_window_channel || !("BroadcastChannel" in window)) return;
+
+  rfid_window_channel = new BroadcastChannel(RFID_WINDOW_CHANNEL);
+  rfid_window_channel.onmessage = function (event) {
+    const message = event.data || {};
+    if (!message.id) return;
+
+    if (message.type === "goodbye") {
+      delete other_rfid_windows[message.id];
+    } else {
+      // Answer a window we haven't heard from yet so it knows about us right away
+      const is_new_window = !other_rfid_windows[message.id];
+      other_rfid_windows[message.id] = {
+        active: message.active,
+        last_seen: Date.now(),
+      };
+      if (is_new_window) announce_rfid_window();
+    }
+
+    update_multiple_windows_warning();
+  };
+
+  setInterval(function () {
+    announce_rfid_window();
+    update_multiple_windows_warning();
+  }, 2000);
+
+  document.addEventListener("visibilitychange", function () {
+    announce_rfid_window();
+    update_multiple_windows_warning();
+  });
+
+  window.addEventListener("pagehide", function () {
+    announce_rfid_window("goodbye");
+  });
+
+  announce_rfid_window();
+}
 
 function handle_one_at_a_time(
   action,
@@ -1302,6 +1385,34 @@ function initFloatingResetButton() {
   }
 
   return $reset_box;
+}
+
+// Create the warning shown while RFID is also active in another visible window
+function initMultipleWindowsWarning() {
+  if ($('#rfid-multiple-windows-warning').length) return $('#rfid-multiple-windows-warning');
+
+  // Not a div.alert, halted dialogs get the "Continue processing" button appended to every div.alert
+  return $(`
+        <div class="noprint" id="rfid-multiple-windows-warning" role="alert" style="
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 600px;
+            background: #fff3cd;
+            border: 1px solid #ffda6a;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            color: #664d03;
+            padding: 10px 15px;
+            z-index: 10000;
+            display: none;
+        ">
+            <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+            <strong>RFID is also active in another Koha window.</strong>
+            Both windows will process items placed on the RFID pad. Close or minimize the other window.
+        </div>
+    `).appendTo('body');
 }
 
 function initFloatingBarcodeBox() {

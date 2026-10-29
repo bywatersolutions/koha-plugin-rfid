@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A warning appears at the top of the page when RFID is active in more than one visible Koha window, for example two windows side by side. Both windows would process the items placed on the RFID pad, so close or minimize one of them.
+
 ### Fixed
 
 - Items left on the RFID pad are no longer checked in or checked out a second time when a slip prints or another Koha tab or window is opened. This caused the hold prompt to appear twice at checkin and an unexpected renewal prompt at checkout.
