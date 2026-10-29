@@ -1095,11 +1095,17 @@ let alter_security_bits = async (items, bit_value) => {
 function poll_rfid_for_barcodes_batch(cb, no_wait = false) {
     console.log("poll_rfid_for_barcodes_batch", cb);
 
+    // Only one poller per page, a forgotten one keeps acting on the pad after the tab is hidden
+    if (intervalID) {
+        clearInterval(intervalID);
+    }
+
     let items_count = 0;
     let polling = false;
 
     const pollIntervalID = setInterval(function () {
-        if (polling) return;
+        // A hidden tab must not act on the pad, the librarian is using it from another tab or window
+        if (polling || document.hidden) return;
 
         polling = true;
 
@@ -1108,6 +1114,9 @@ function poll_rfid_for_barcodes_batch(cb, no_wait = false) {
                 return rfidVendor.getItems();
             })
             .then(function (data) {
+                // This poller was stopped or replaced while the request was in flight
+                if (intervalID !== pollIntervalID) return;
+
                 if (!data || !data.items || !data.items.length) {
                     items_count = 0;
                     return;
