@@ -15,7 +15,8 @@ describe("RFID checkout state is per tab", () => {
     cy.setPad(barcode);
 
     cy.visitCheckout();
-    cy.get("#issues-table", { timeout: 20000 }).should("contain", barcode);
+    // Koha only fills the checkouts table on demand, the "Checked out" message shows the checkout went through
+    cy.get("div.lastchecked", { timeout: 20000 }).should("contain", barcode);
 
     cy.rfidLoadCounter().then(counter => {
       // What handle_action_change() in another tab did to the shared storage
