@@ -94,7 +94,7 @@ export DB_NAME="${DB_NAME:-koha_kohadev}"
 # every vendor, so it runs once ( on the first vendor ). Only the genuinely
 # vendor-specific specs -- reader detection and the security-bit round-trip --
 # re-run for each subsequent vendor.
-PER_VENDOR_SPECS="$SCRIPT_DIR/integration/smoke.cy.js,$SCRIPT_DIR/integration/checkout/plain_checkout.cy.js,$SCRIPT_DIR/integration/checkin/plain_checkin.cy.js"
+PER_VENDOR_SPECS="$SCRIPT_DIR/integration/smoke.cy.js,$SCRIPT_DIR/integration/checkout/plain_checkout.cy.js,$SCRIPT_DIR/integration/checkin/plain_checkin.cy.js,$SCRIPT_DIR/integration/multi_part_item.cy.js"
 
 OVERALL_RC=0
 first_vendor=1

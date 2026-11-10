@@ -73,6 +73,11 @@ Cypress.Commands.add("rfidSecurity", barcode =>
   })
 );
 
+// Set an item's security bit directly on the emulator, on all of its tags.
+Cypress.Commands.add("setPadSecurity", (barcode, value) =>
+  cy.request(`${Cypress.env("emulatorUrl")}/setsecurity/${barcode}/${value}`)
+);
+
 // Assert an item's security bit, retrying so the plugin's async setSecurityBit
 // has time to land.
 Cypress.Commands.add("assertSecurity", (barcode, expected) => {

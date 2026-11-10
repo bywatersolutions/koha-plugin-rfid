@@ -43,12 +43,15 @@ Cypress.Commands.add("clearRfidStorage", () => {
 });
 
 // Set the items "on the pad". Accepts a string or an array of barcodes.
-Cypress.Commands.add("setPad", barcodes => {
+// tags optionally maps a barcode to how many RFID tags the item has, for
+// multi-part items. Only the bibliotheca emulator models tags, the other
+// vendors set security by barcode and ignore it.
+Cypress.Commands.add("setPad", (barcodes, tags = {}) => {
   const list = Array.isArray(barcodes) ? barcodes.join(" ") : barcodes;
   cy.request({
     method: "POST",
     url: `${Cypress.env("emulatorUrl")}/api/barcodes`,
-    body: { barcodes: list },
+    body: { barcodes: list, tags: tags },
   });
 });
 
