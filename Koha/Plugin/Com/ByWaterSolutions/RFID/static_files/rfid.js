@@ -150,13 +150,15 @@ const rfidVendor = {
             const isSecure = item.IsSecured ? false : true;
             console.log("Is secure:", isSecure);
             // Bibliotheca flips the security bit by tag id ( serial number ),
-            // not barcode. Guard against an item with no tags so one malformed
-            // item doesn't throw and wipe out the whole batch.
-            const tagId = item.Tags && item.Tags[0] ? item.Tags[0].Id : null;
+            // not barcode. A multi-part item ( e.g. a DVD case and its disc )
+            // has one tag per part, and all of them must be flipped. Guard
+            // against an item with no tags so one malformed item doesn't throw
+            // and wipe out the whole batch.
+            const tagIds = (item.Tags || []).map(tag => tag.Id);
             result.items.push({
               barcode: barcode,
               security: isSecure,
-              tagId: tagId
+              tagIds: tagIds
             });
           }
 
@@ -172,17 +174,20 @@ const rfidVendor = {
         });
       },
       setSecurityBit: function (item, bitValue) {
-        return $.ajax({
-          url: `${this.baseUrl}/SetTagSecurity`,
-          dataType: "json",
-          contentType: "application/json",
-          async: false,
-          method: "POST",
-          data: JSON.stringify({
-            tagId: item.tagId,
-            isSecured: bitValue ? true : false
+        const requests = item.tagIds.map(tagId =>
+          $.ajax({
+            url: `${this.baseUrl}/SetTagSecurity`,
+            dataType: "json",
+            contentType: "application/json",
+            async: false,
+            method: "POST",
+            data: JSON.stringify({
+              tagId: tagId,
+              isSecured: bitValue ? true : false
+            })
           })
-        });
+        );
+        return $.when(...requests);
       }
     },
     circit: {
