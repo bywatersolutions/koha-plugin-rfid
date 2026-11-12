@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-12
+
 ### Fixed
 
 - Bibliotheca: items with more than one RFID tag, such as a DVD with tags on the case and the disc, now have the security bit set on every tag at checkout, checkin and renewal. Only the first tag was changed, so the item showed as "Partial" in Bibliotheca staffConnect link and could set off the security gates.
